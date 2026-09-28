@@ -13,7 +13,6 @@ Toones is a location-based social audio app: open a map, discover nearby sound p
 
 ```bash
 npm install
-cp .env.example .env
 npm run dev
 ```
 
@@ -31,7 +30,7 @@ Expected response:
 
 ## Backend Environment
 
-See `.env.example`.
+Create a local `.env` file when running the API.
 
 - `PORT`: local API port
 - `MONGODB_URI`: MongoDB connection string
