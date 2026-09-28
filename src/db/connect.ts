@@ -1,5 +1,9 @@
 import mongoose from "mongoose";
 
+export function isMongoConnected(): boolean {
+  return mongoose.connection.readyState === 1;
+}
+
 export async function connectMongo(uri: string): Promise<void> {
   if (!uri) {
     console.warn("MONGODB_URI is not set; starting API without MongoDB.");

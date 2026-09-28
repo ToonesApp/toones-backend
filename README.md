@@ -37,6 +37,14 @@ Create a local `.env` file when running the API.
 - `JWT_SECRET`: secret for future JWT signing
 - `CORS_ORIGIN`: local React origin, usually `http://localhost:5173`
 
+## Auth API
+
+- `POST /auth/register`: create an account and return a JWT
+- `POST /auth/login`: sign in with email or username and return a JWT
+- `GET /auth/me`: return the current user from a bearer token
+
+Auth endpoints require MongoDB. If Mongo is offline, they return `503` while `/health` still works.
+
 ## MongoDB Notes
 
 Sound posts should store location as GeoJSON for radius queries:
@@ -52,7 +60,6 @@ Add a `2dsphere` index on `location`. Also plan indexes for `category`, `tags`, 
 
 ## First Backend Roadmap
 
-1. Auth
-2. Sounds CRUD
-3. Geo query
-4. Upload signed URL
+1. Sounds CRUD
+2. Geo query
+3. Upload signed URL
