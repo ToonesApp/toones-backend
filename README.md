@@ -9,18 +9,9 @@ Toones is a location-based social audio app: open a map, discover nearby sound p
 - Design: UI/UX, flows, visual system
 - Database: MongoDB schema, indexes, seed data
 
-## Repo Layout
-
-```text
-toones/
-  backend/   Node.js, TypeScript, Express API
-  frontend/  React app placeholder for the frontend lead
-```
-
-## Run Backend Locally
+## Run Locally
 
 ```bash
-cd backend
 npm install
 cp .env.example .env
 npm run dev
@@ -40,7 +31,7 @@ Expected response:
 
 ## Backend Environment
 
-See `backend/.env.example`.
+See `.env.example`.
 
 - `PORT`: local API port
 - `MONGODB_URI`: MongoDB connection string
