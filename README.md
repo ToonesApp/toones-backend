@@ -56,7 +56,17 @@ location: {
 }
 ```
 
-Add a `2dsphere` index on `location`. Also plan indexes for `category`, `tags`, `userId`, and `createdAt` as the schema stabilizes.
+`src/models/Sound.ts` defines a `2dsphere` index on `location` plus indexes for `category`, `tags`, `userId`, and `createdAt`.
+
+### Seed data
+
+Copy `.env.example` to `.env`, set `MONGODB_URI`, then run:
+
+```bash
+npm run seed
+```
+
+This creates demo users (`maya`, `leo`, `sana` at `@seed.toones.dev`, password `password123`) and sample sounds. Re-running replaces only the seed data.
 
 ## First Backend Roadmap
 
