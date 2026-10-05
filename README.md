@@ -66,7 +66,7 @@ Copy `.env.example` to `.env`, set `MONGODB_URI`, then run:
 npm run seed
 ```
 
-This creates demo users (`maya`, `leo`, `sana` at `@seed.toones.dev`, password `password123`) and sample sounds. Re-running replaces only the seed data.
+This creates demo users (`maya`, `leo`, `sana` at `@seed.toones.dev`, password `password123`) and sample sounds, plus listens, follows, and XP for those users. Re-running replaces only the seed data.
 
 ## First Backend Roadmap
 
