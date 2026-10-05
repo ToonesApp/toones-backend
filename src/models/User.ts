@@ -1,5 +1,7 @@
 import mongoose, { type HydratedDocument, type Model } from "mongoose";
 
+import { levelFromXp } from "../lib/xp.js";
+
 const { Schema, model, models } = mongoose;
 
 export interface User {
@@ -7,13 +9,18 @@ export interface User {
   username: string;
   displayName: string;
   passwordHash: string;
+  xp: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export type UserDocument = HydratedDocument<User>;
+export interface UserVirtuals {
+  level: number;
+}
 
-const userSchema = new Schema<User>(
+export type UserDocument = HydratedDocument<User, UserVirtuals>;
+
+const userSchema = new Schema<User, Model<User, object, object, UserVirtuals>, object, object, UserVirtuals>(
   {
     email: {
       type: String,
@@ -38,10 +45,22 @@ const userSchema = new Schema<User>(
       type: String,
       required: true,
       select: false
+    },
+    xp: {
+      type: Number,
+      default: 0,
+      min: 0
     }
   },
   { timestamps: true }
 );
 
+userSchema.virtual("level").get(function () {
+  return levelFromXp(this.xp ?? 0);
+});
+
+type UserModelType = Model<User, object, object, UserVirtuals>;
+
 export const UserModel =
-  (models.User as Model<User> | undefined) ?? model<User>("User", userSchema);
+  (models.User as UserModelType | undefined) ??
+  model<User, UserModelType>("User", userSchema);

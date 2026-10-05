@@ -45,6 +45,8 @@ function publicUser(user: UserDocument) {
     email: user.email,
     username: user.username,
     displayName: user.displayName,
+    xp: user.xp,
+    level: user.level,
     createdAt: user.createdAt.toISOString()
   };
 }
