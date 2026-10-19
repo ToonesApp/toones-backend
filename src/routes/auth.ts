@@ -39,6 +39,31 @@ function normalizeUsername(value: unknown): string {
   return normalizeText(value).toLowerCase();
 }
 
+/** Turns an email's local part into a valid username base: [a-z0-9_], 3-18 chars. */
+function usernameBaseFromEmail(email: string): string {
+  const base = (email.split("@")[0] ?? "")
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 18);
+
+  return (base || "user").padEnd(3, "0");
+}
+
+/** Picks a free username from the email, adding a numeric suffix on collisions. */
+async function generateUsername(email: string): Promise<string> {
+  const base = usernameBaseFromEmail(email);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = attempt === 0 ? base : `${base}${Math.floor(1000 + Math.random() * 9000)}`;
+
+    if (!(await UserModel.exists({ username: candidate }))) {
+      return candidate;
+    }
+  }
+
+  return `${base.slice(0, 14)}${Date.now().toString(36).slice(-8)}`.slice(0, 24);
+}
+
 function publicUser(user: UserDocument) {
   return {
     id: user._id.toString(),
@@ -87,7 +112,8 @@ router.post("/register", async (req, res) => {
 
   const { email, username, displayName, password } = req.body as RegisterBody;
   const normalizedEmail = normalizeEmail(email);
-  const normalizedUsername = normalizeUsername(username);
+  let normalizedUsername = normalizeUsername(username);
+  const usernameWasGenerated = normalizedUsername === "";
   const cleanedDisplayName = normalizeText(displayName);
   const rawPassword = stringValue(password);
 
@@ -96,7 +122,7 @@ router.post("/register", async (req, res) => {
     return;
   }
 
-  if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+  if (!usernameWasGenerated && !/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
     res.status(400).json({ error: "Username must be 3-24 characters using letters, numbers, or underscores." });
     return;
   }
@@ -112,13 +138,19 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    const existingUser = await UserModel.findOne({
-      $or: [{ email: normalizedEmail }, { username: normalizedUsername }]
-    });
+    const existingUser = await UserModel.findOne(
+      usernameWasGenerated
+        ? { email: normalizedEmail }
+        : { $or: [{ email: normalizedEmail }, { username: normalizedUsername }] }
+    );
 
     if (existingUser) {
       res.status(409).json({ error: "Email or username is already in use." });
       return;
+    }
+
+    if (usernameWasGenerated) {
+      normalizedUsername = await generateUsername(normalizedEmail);
     }
 
     const passwordHash = await bcrypt.hash(rawPassword, passwordSaltRounds);
