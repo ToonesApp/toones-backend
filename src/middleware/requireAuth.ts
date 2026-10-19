@@ -17,6 +17,20 @@ function getBearerToken(req: Request): string | null {
   return header.slice("Bearer ".length).trim();
 }
 
+function verifyToken(token: string): string | null {
+  try {
+    const decoded = jwt.verify(token, env.jwtSecret);
+
+    if (typeof decoded === "string" || !decoded.sub) {
+      return null;
+    }
+
+    return (decoded as AuthTokenPayload).sub;
+  } catch {
+    return null;
+  }
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const token = getBearerToken(req);
 
@@ -30,17 +44,25 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
-  try {
-    const decoded = jwt.verify(token, env.jwtSecret);
+  const userId = verifyToken(token);
 
-    if (typeof decoded === "string" || !decoded.sub) {
-      res.status(401).json({ error: "Invalid token." });
-      return;
-    }
-
-    req.auth = { userId: (decoded as AuthTokenPayload).sub };
-    next();
-  } catch {
+  if (!userId) {
     res.status(401).json({ error: "Invalid token." });
+    return;
   }
+
+  req.auth = { userId };
+  next();
+}
+
+/** Sets req.auth when a valid token is sent; anonymous requests pass through. */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const token = getBearerToken(req);
+  const userId = token && env.jwtSecret ? verifyToken(token) : null;
+
+  if (userId) {
+    req.auth = { userId };
+  }
+
+  next();
 }

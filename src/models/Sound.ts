@@ -15,7 +15,7 @@ export interface Sound {
   userId: Types.ObjectId;
   title: string;
   description?: string;
-  audioUrl: string;
+  audioUrl?: string;
   durationSec: number;
   category: SoundCategory;
   tags: string[];
@@ -72,9 +72,9 @@ const soundSchema = new Schema<Sound>(
       trim: true,
       maxlength: 280
     },
+    // Optional until audio upload storage exists; the frontend keeps recordings in the browser for now.
     audioUrl: {
       type: String,
-      required: true,
       trim: true
     },
     durationSec: {

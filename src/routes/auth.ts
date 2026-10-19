@@ -15,6 +15,7 @@ type RegisterBody = {
   email?: unknown;
   username?: unknown;
   displayName?: unknown;
+  name?: unknown;
   password?: unknown;
 };
 
@@ -37,6 +38,28 @@ function normalizeEmail(value: unknown): string {
 
 function normalizeUsername(value: unknown): string {
   return normalizeText(value).toLowerCase();
+}
+
+const usernamePattern = /^[a-z0-9_]{3,24}$/;
+
+async function generateUsername(email: string): Promise<string> {
+  const base = (email.split("@")[0] ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 18)
+    .padEnd(3, "0");
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = attempt === 0 ? base : `${base}_${Math.floor(1000 + Math.random() * 9000)}`;
+
+    if (!(await UserModel.exists({ username: candidate }))) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Could not generate a unique username.");
 }
 
 function publicUser(user: UserDocument) {
@@ -85,10 +108,10 @@ router.post("/register", async (req, res) => {
     return;
   }
 
-  const { email, username, displayName, password } = req.body as RegisterBody;
+  const { email, username, displayName, name, password } = req.body as RegisterBody;
   const normalizedEmail = normalizeEmail(email);
-  const normalizedUsername = normalizeUsername(username);
-  const cleanedDisplayName = normalizeText(displayName);
+  const requestedUsername = normalizeUsername(username);
+  const cleanedDisplayName = normalizeText(displayName) || normalizeText(name);
   const rawPassword = stringValue(password);
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
@@ -96,7 +119,7 @@ router.post("/register", async (req, res) => {
     return;
   }
 
-  if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+  if (requestedUsername && !usernamePattern.test(requestedUsername)) {
     res.status(400).json({ error: "Username must be 3-24 characters using letters, numbers, or underscores." });
     return;
   }
@@ -112,6 +135,7 @@ router.post("/register", async (req, res) => {
   }
 
   try {
+    const normalizedUsername = requestedUsername || (await generateUsername(normalizedEmail));
     const existingUser = await UserModel.findOne({
       $or: [{ email: normalizedEmail }, { username: normalizedUsername }]
     });
