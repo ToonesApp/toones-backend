@@ -1,5 +1,6 @@
 import bcrypt from "bcrypt";
 import { Router, type Response } from "express";
+import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
@@ -22,6 +23,12 @@ type LoginBody = {
   emailOrUsername?: unknown;
   password?: unknown;
 };
+
+type GoogleBody = {
+  credential?: unknown;
+};
+
+const googleClient = new OAuth2Client();
 
 function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -190,7 +197,8 @@ router.post("/login", async (req, res) => {
     $or: [{ email: login }, { username: login }]
   }).select("+passwordHash");
 
-  if (!user) {
+  // Google-only accounts have no password, so password login can never succeed for them.
+  if (!user || !user.passwordHash) {
     res.status(401).json({ error: "Invalid credentials." });
     return;
   }
@@ -203,6 +211,77 @@ router.post("/login", async (req, res) => {
   }
 
   res.status(200).json({ token: signToken(user), user: publicUser(user) });
+});
+
+/**
+ * Sign in or sign up with a Google ID token (the `credential` from Google Identity Services).
+ * The token is verified against our client id; an account is matched by Google id, then by
+ * verified email, and created if neither exists.
+ */
+router.post("/google", async (req, res) => {
+  if (!env.googleClientId) {
+    res.status(503).json({ error: "Google sign-in is not configured." });
+    return;
+  }
+
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  const credential = stringValue((req.body as GoogleBody).credential);
+
+  if (!credential) {
+    res.status(400).json({ error: "A Google credential is required." });
+    return;
+  }
+
+  let payload;
+
+  try {
+    const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: env.googleClientId });
+    payload = ticket.getPayload();
+  } catch {
+    res.status(401).json({ error: "Invalid Google credential." });
+    return;
+  }
+
+  if (!payload?.sub || !payload.email || !payload.email_verified) {
+    res.status(401).json({ error: "Your Google account needs a verified email." });
+    return;
+  }
+
+  const email = normalizeEmail(payload.email);
+
+  try {
+    let user = await UserModel.findOne({ googleId: payload.sub });
+
+    if (!user) {
+      user = await UserModel.findOne({ email });
+
+      if (user) {
+        user.googleId = payload.sub;
+        await user.save();
+      } else {
+        const displayName = normalizeText(payload.name ?? email.split("@")[0]).slice(0, 60) || "Toones user";
+
+        user = await UserModel.create({
+          email,
+          username: await generateUsername(email),
+          displayName,
+          googleId: payload.sub
+        });
+      }
+    }
+
+    res.status(200).json({ token: signToken(user), user: publicUser(user) });
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      res.status(409).json({ error: "Email or username is already in use." });
+      return;
+    }
+
+    res.status(500).json({ error: "Could not sign in with Google." });
+  }
 });
 
 router.get("/me", requireAuth, async (req, res) => {

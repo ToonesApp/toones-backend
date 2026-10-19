@@ -35,12 +35,14 @@ Create a local `.env` file when running the API.
 - `PORT`: local API port
 - `MONGODB_URI`: MongoDB connection string
 - `JWT_SECRET`: secret for future JWT signing
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID used to verify Google sign-in tokens (optional)
 - `CORS_ORIGIN`: allowed React origin, usually `http://localhost:5173`. Accepts a comma-separated list to allow the deployed client alongside local dev.
 
 ## Auth API
 
 - `POST /auth/register`: create an account and return a JWT
 - `POST /auth/login`: sign in with email or username and return a JWT
+- `POST /auth/google`: sign in or sign up with a Google ID token (`{ credential }`) and return a JWT. Requires `GOOGLE_CLIENT_ID`; returns `503` when it is unset. Existing accounts are linked by verified email.
 - `GET /auth/me`: return the current user from a bearer token
 
 Auth endpoints require MongoDB. If Mongo is offline, they return `503` while `/health` still works.

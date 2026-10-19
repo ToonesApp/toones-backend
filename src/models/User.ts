@@ -8,7 +8,10 @@ export interface User {
   email: string;
   username: string;
   displayName: string;
-  passwordHash: string;
+  /** Absent for accounts created through Google sign-in. */
+  passwordHash?: string;
+  /** Google's stable subject id; present once the account is linked to Google. */
+  googleId?: string;
   xp: number;
   createdAt: Date;
   updatedAt: Date;
@@ -43,8 +46,15 @@ const userSchema = new Schema<User, Model<User, object, object, UserVirtuals>, o
     },
     passwordHash: {
       type: String,
-      required: true,
+      required: function (this: { googleId?: string }) {
+        return !this.googleId;
+      },
       select: false
+    },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true
     },
     xp: {
       type: Number,
