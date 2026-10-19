@@ -17,6 +17,25 @@ function getBearerToken(req: Request): string | null {
   return header.slice("Bearer ".length).trim();
 }
 
+/** Attaches `req.auth` when a valid bearer token is present; otherwise continues anonymously. */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+  const token = getBearerToken(req);
+
+  if (token && env.jwtSecret) {
+    try {
+      const decoded = jwt.verify(token, env.jwtSecret);
+
+      if (typeof decoded !== "string" && decoded.sub) {
+        req.auth = { userId: (decoded as AuthTokenPayload).sub };
+      }
+    } catch {
+      // An expired or invalid token just means the caller is treated as anonymous.
+    }
+  }
+
+  next();
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const token = getBearerToken(req);
 

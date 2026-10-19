@@ -47,6 +47,17 @@ Create a local `.env` file when running the API.
 
 Auth endpoints require MongoDB. If Mongo is offline, they return `503` while `/health` still works.
 
+## Sounds API (feed)
+
+Audio files are stored in MongoDB GridFS (bucket `audio`), so there is no separate storage service to configure.
+
+- `POST /sounds` (bearer token): multipart form with an `audio` file (webm, ogg, mp4, mpeg, wav; max 5 MB) plus `title`, `category`, `lon`, `lat`, `durationSec` (1-60) and optional `description`, `placeName`, `tags` (comma list). Returns `{ sound, xp, level }` and awards drop XP.
+- `GET /sounds`: the feed, newest first. Optional query: `category` (comma list), `limit` (max 200), `before` (ISO date cursor, use `nextBefore`), `near=lon,lat` with `radiusKm`. Send a bearer token to get per-user `listened`/`mine` flags.
+- `GET /sounds/:id/audio`: streams the audio. Public, so a plain `<audio>` element works.
+- `POST /sounds/:id/listen` (bearer token): the first listen per user earns XP; replays only bump `playCount`. Returns `{ firstListen, playCount, xp, level }`.
+
+Categories: `nature`, `language`, `culture`, `music`, `city`. The free Atlas tier holds 512 MB, roughly 500 short clips.
+
 ## MongoDB Notes
 
 Sound posts should store location as GeoJSON for radius queries:

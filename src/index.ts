@@ -5,8 +5,12 @@ import { env } from "./config/env.js";
 import { connectMongo } from "./db/connect.js";
 import authRouter from "./routes/auth.js";
 import healthRouter from "./routes/health.js";
+import soundsRouter from "./routes/sounds.js";
 
 const app = express();
+
+// Render terminates TLS in front of the app; trust it so req.protocol is "https" when building audio URLs.
+app.set("trust proxy", 1);
 
 app.use(
   cors({
@@ -18,6 +22,7 @@ app.use(express.json());
 
 app.use("/auth", authRouter);
 app.use("/health", healthRouter);
+app.use("/sounds", soundsRouter);
 
 app.listen(env.port, () => {
   console.log(`Toones API listening on port ${env.port}.`);

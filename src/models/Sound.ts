@@ -16,6 +16,10 @@ export interface Sound {
   title: string;
   description?: string;
   audioUrl: string;
+  /** GridFS file id when the audio is stored by this API; absent for external audioUrl values. */
+  audioFileId?: Types.ObjectId;
+  /** Validated audio MIME type of the GridFS file, used as the response Content-Type. */
+  audioMime?: string;
   durationSec: number;
   category: SoundCategory;
   tags: string[];
@@ -75,6 +79,13 @@ const soundSchema = new Schema<Sound>(
     audioUrl: {
       type: String,
       required: true,
+      trim: true
+    },
+    audioFileId: {
+      type: Schema.Types.ObjectId
+    },
+    audioMime: {
+      type: String,
       trim: true
     },
     durationSec: {
