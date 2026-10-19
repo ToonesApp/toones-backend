@@ -3,7 +3,8 @@ services:
     name: toones-api
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    # --include=dev because tsc is a devDependency and hosts often set NODE_ENV=production.
+    buildCommand: npm install --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
     envVars:
