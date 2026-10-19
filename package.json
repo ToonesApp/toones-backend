@@ -5,6 +5,9 @@
   "description": "Express API for Toones.",
   "type": "module",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "npm run build && node dist/index.js",
     "build": "tsc",

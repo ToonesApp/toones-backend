@@ -35,7 +35,7 @@ Create a local `.env` file when running the API.
 - `PORT`: local API port
 - `MONGODB_URI`: MongoDB connection string
 - `JWT_SECRET`: secret for future JWT signing
-- `CORS_ORIGIN`: local React origin, usually `http://localhost:5173`
+- `CORS_ORIGIN`: allowed React origin, usually `http://localhost:5173`. Accepts a comma-separated list to allow the deployed client alongside local dev.
 
 ## Auth API
 

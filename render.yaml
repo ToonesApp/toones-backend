@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: toones-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      # Render injects PORT itself; src/config/env.ts already reads it.
+      # Secrets are set in the dashboard, never committed here.
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
