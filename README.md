@@ -7,7 +7,7 @@ Toones is a location-based social audio app: open a map, discover nearby sound p
 - Backend: APIs, auth, business logic, audio upload orchestration
 - Frontend: React client, map, player, upload UI, social UI
 - Design: UI/UX, flows, visual system
-- Database: MongoDB schema, indexes, seed data
+- Database: MongoDB schema, indexes
 
 ## Run Locally
 
@@ -74,16 +74,6 @@ location: {
 ```
 
 `src/models/Sound.ts` defines a `2dsphere` index on `location` plus indexes for `category`, `tags`, `userId`, and `createdAt`.
-
-### Seed data
-
-Copy `.env.example` to `.env`, set `MONGODB_URI`, then run:
-
-```bash
-npm run seed
-```
-
-This creates demo users (`maya`, `leo`, `sana` at `@seed.toones.dev`, password `password123`) and sample sounds, plus listens, follows, and XP for those users. Re-running replaces only the seed data.
 
 ## First Backend Roadmap
 
