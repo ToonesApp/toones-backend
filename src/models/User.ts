@@ -1,5 +1,6 @@
 import mongoose, { type HydratedDocument, type Model } from "mongoose";
 
+import type { Look } from "../lib/look.js";
 import { levelFromXp } from "../lib/xp.js";
 
 const { Schema, model, models } = mongoose;
@@ -13,6 +14,8 @@ export interface User {
   /** Google's stable subject id; present once the account is linked to Google. */
   googleId?: string;
   xp: number;
+  /** The user's dress-up character; absent until they save one. */
+  look?: Look;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +63,23 @@ const userSchema = new Schema<User, Model<User, object, object, UserVirtuals>, o
       type: Number,
       default: 0,
       min: 0
+    },
+    look: {
+      type: {
+        _id: false,
+        species: String,
+        bg: String,
+        hair: String,
+        hairColor: Number,
+        hat: String,
+        glasses: String,
+        eyes: String,
+        mouth: String,
+        outfit: String,
+        facial: String,
+        color: Number
+      },
+      default: undefined
     }
   },
   { timestamps: true }

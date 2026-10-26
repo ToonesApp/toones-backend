@@ -4,6 +4,7 @@ import multer from "multer";
 
 import { isMongoConnected } from "../db/connect.js";
 import { MAX_AUDIO_BYTES, audioLength, deleteAudio, normalizeAudioMime, openAudio, storeAudio } from "../lib/audio.js";
+import type { Look } from "../lib/look.js";
 import { XP_PER_DROP, XP_PER_LISTEN } from "../lib/xp.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
@@ -36,7 +37,7 @@ type SoundLean = {
   createdAt: Date;
 };
 
-type Author = { id: string; username: string; displayName: string };
+type Author = { id: string; username: string; displayName: string; look: Look | null };
 
 function ensureMongo(res: Response): boolean {
   if (isMongoConnected()) {
@@ -98,12 +99,17 @@ function publicSound(
 }
 
 async function authorsById(ids: mongoose.Types.ObjectId[]): Promise<Map<string, Author>> {
-  const users = await UserModel.find({ _id: { $in: ids } }, "username displayName").lean();
+  const users = await UserModel.find({ _id: { $in: ids } }, "username displayName look").lean();
 
   return new Map(
     users.map((user) => [
       user._id.toString(),
-      { id: user._id.toString(), username: user.username, displayName: user.displayName }
+      {
+        id: user._id.toString(),
+        username: user.username,
+        displayName: user.displayName,
+        look: user.look ? plainLook(user.look) : null
+      }
     ])
   );
 }

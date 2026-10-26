@@ -5,7 +5,10 @@ import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
 import { isMongoConnected } from "../db/connect.js";
+import { firstLockedPart, parseLook, type Look } from "../lib/look.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { ListenModel } from "../models/Listen.js";
+import { SoundModel } from "../models/Sound.js";
 import { UserModel, type UserDocument } from "../models/User.js";
 
 const router = Router();
@@ -71,6 +74,13 @@ async function generateUsername(email: string): Promise<string> {
   return `${base.slice(0, 14)}${Date.now().toString(36).slice(-8)}`.slice(0, 24);
 }
 
+/** Strips Mongoose bookkeeping so only the look's own fields are sent. */
+function plainLook(look: Look): Look {
+  const { species, bg, hair, hairColor, hat, glasses, eyes, mouth, outfit, facial, color } = look;
+
+  return { species, bg, hair, hairColor, hat, glasses, eyes, mouth, outfit, facial, color };
+}
+
 function publicUser(user: UserDocument) {
   return {
     id: user._id.toString(),
@@ -79,6 +89,7 @@ function publicUser(user: UserDocument) {
     displayName: user.displayName,
     xp: user.xp,
     level: user.level,
+    look: user.look ? plainLook(user.look) : null,
     createdAt: user.createdAt.toISOString()
   };
 }
@@ -297,6 +308,47 @@ router.get("/me", requireAuth, async (req, res) => {
   }
 
   res.status(200).json({ user: publicUser(user) });
+});
+
+/** Saves the signed-in user's character. Rejects unknown parts and anything the user hasn't unlocked yet. */
+router.put("/me/look", requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  const look = parseLook((req.body as { look?: unknown } | undefined)?.look);
+
+  if (!look) {
+    res.status(400).json({ error: "That character isn't valid." });
+    return;
+  }
+
+  try {
+    const user = await UserModel.findById(req.auth?.userId);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    const [drops, places, listens] = await Promise.all([
+      SoundModel.countDocuments({ userId: user._id }),
+      SoundModel.distinct("placeName", { userId: user._id, placeName: { $nin: [null, ""] } }),
+      ListenModel.countDocuments({ userId: user._id })
+    ]);
+
+    if (firstLockedPart(look, { xp: user.xp, drops, places: places.length, listens })) {
+      res.status(403).json({ error: "That character uses items you haven't unlocked yet." });
+      return;
+    }
+
+    user.look = look;
+    await user.save();
+
+    res.status(200).json({ user: publicUser(user) });
+  } catch {
+    res.status(500).json({ error: "Could not save your character." });
+  }
 });
 
 export default router;
