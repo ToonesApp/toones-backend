@@ -147,3 +147,10 @@ export function firstLockedPart(look: Look, progress: Progress): string | null {
 
   return null;
 }
+
+/** Strips Mongoose bookkeeping so only the look's own fields are sent. */
+export function plainLook(look: Look): Look {
+  const { species, bg, hair, hairColor, hat, glasses, eyes, mouth, outfit, facial, color } = look;
+
+  return { species, bg, hair, hairColor, hat, glasses, eyes, mouth, outfit, facial, color };
+}

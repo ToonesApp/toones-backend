@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
 import { isMongoConnected } from "../db/connect.js";
-import { firstLockedPart, parseLook, type Look } from "../lib/look.js";
+import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel } from "../models/Sound.js";
@@ -72,13 +72,6 @@ async function generateUsername(email: string): Promise<string> {
   }
 
   return `${base.slice(0, 14)}${Date.now().toString(36).slice(-8)}`.slice(0, 24);
-}
-
-/** Strips Mongoose bookkeeping so only the look's own fields are sent. */
-function plainLook(look: Look): Look {
-  const { species, bg, hair, hairColor, hat, glasses, eyes, mouth, outfit, facial, color } = look;
-
-  return { species, bg, hair, hairColor, hat, glasses, eyes, mouth, outfit, facial, color };
 }
 
 function publicUser(user: UserDocument) {

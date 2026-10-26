@@ -4,7 +4,7 @@ import multer from "multer";
 
 import { isMongoConnected } from "../db/connect.js";
 import { MAX_AUDIO_BYTES, audioLength, deleteAudio, normalizeAudioMime, openAudio, storeAudio } from "../lib/audio.js";
-import type { Look } from "../lib/look.js";
+import { plainLook, type Look } from "../lib/look.js";
 import { XP_PER_DROP, XP_PER_LISTEN } from "../lib/xp.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
