@@ -4,6 +4,7 @@ import express from "express";
 import { env } from "./config/env.js";
 import { connectMongo } from "./db/connect.js";
 import authRouter from "./routes/auth.js";
+import friendsRouter from "./routes/friends.js";
 import healthRouter from "./routes/health.js";
 import soundsRouter from "./routes/sounds.js";
 
@@ -21,6 +22,7 @@ app.use(
 app.use(express.json());
 
 app.use("/auth", authRouter);
+app.use("/friends", friendsRouter);
 app.use("/health", healthRouter);
 app.use("/sounds", soundsRouter);
 
