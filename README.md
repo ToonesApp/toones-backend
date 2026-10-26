@@ -55,6 +55,10 @@ Audio files are stored in MongoDB GridFS (bucket `audio`), so there is no separa
 - `GET /sounds`: the feed, newest first. Optional query: `category` (comma list), `limit` (max 200), `before` (ISO date cursor, use `nextBefore`), `near=lon,lat` with `radiusKm`. Send a bearer token to get per-user `listened`/`mine` flags.
 - `GET /sounds/:id/audio`: streams the audio. Public, so a plain `<audio>` element works.
 - `POST /sounds/:id/listen` (bearer token): the first listen per user earns XP; replays only bump `playCount`. Returns `{ firstListen, playCount, xp, level }`.
+- `POST /sounds/:id/photos` (bearer token, uploader only): multipart form with one `photo` file (JPEG, PNG or WebP, detected from the file's bytes; max 4 MB). Up to 3 photos per sound. Returns `{ photos }`, the sound's photo URLs.
+- `GET /sounds/:id/photos/:photoId`: streams a photo. Public, so a plain `<img>` works. Sound objects in the feed include a `photos` array of these URLs.
+
+Photos are stored in GridFS too (bucket `photos`).
 
 Categories: `nature`, `language`, `culture`, `music`, `city`. The free Atlas tier holds 512 MB, roughly 500 short clips.
 

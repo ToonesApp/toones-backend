@@ -25,9 +25,18 @@ export interface Sound {
   tags: string[];
   location: GeoPoint;
   placeName?: string;
+  /** Up to MAX_PHOTOS_PER_SOUND photos of the place, in upload order. Only the uploader can add them. */
+  photos: SoundPhoto[];
   playCount: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface SoundPhoto {
+  /** GridFS file id in the `photos` bucket. */
+  fileId: Types.ObjectId;
+  /** Sniffed image MIME type, used as the response Content-Type. */
+  mime: string;
 }
 
 export type SoundDocument = HydratedDocument<Sound>;
@@ -53,6 +62,20 @@ const pointSchema = new Schema<GeoPoint>(
           value[1] <= 90,
         message: "coordinates must be [lng, lat] within valid ranges."
       }
+    }
+  },
+  { _id: false }
+);
+
+const photoSchema = new Schema<SoundPhoto>(
+  {
+    fileId: {
+      type: Schema.Types.ObjectId,
+      required: true
+    },
+    mime: {
+      type: String,
+      required: true
     }
   },
   { _id: false }
@@ -112,6 +135,10 @@ const soundSchema = new Schema<Sound>(
       type: String,
       trim: true,
       maxlength: 120
+    },
+    photos: {
+      type: [photoSchema],
+      default: []
     },
     playCount: {
       type: Number,

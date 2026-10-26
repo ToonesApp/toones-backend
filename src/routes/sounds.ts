@@ -5,6 +5,7 @@ import multer from "multer";
 import { isMongoConnected } from "../db/connect.js";
 import { MAX_AUDIO_BYTES, audioLength, deleteAudio, normalizeAudioMime, openAudio, storeAudio } from "../lib/audio.js";
 import { plainLook, type Look } from "../lib/look.js";
+import { MAX_PHOTOS_PER_SOUND, MAX_PHOTO_BYTES, deletePhoto, openPhoto, photoLength, sniffImageMime, storePhoto } from "../lib/photo.js";
 import { XP_PER_DROP, XP_PER_LISTEN } from "../lib/xp.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
@@ -16,6 +17,11 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_AUDIO_BYTES, files: 1 }
+});
+
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PHOTO_BYTES, files: 1 }
 });
 
 const defaultFeedLimit = 100;
@@ -33,6 +39,7 @@ type SoundLean = {
   tags: string[];
   location: { coordinates: [number, number] };
   placeName?: string;
+  photos?: { fileId: mongoose.Types.ObjectId; mime: string }[];
   playCount: number;
   createdAt: Date;
 };
@@ -70,6 +77,10 @@ function origin(req: Request): string {
   return `${req.protocol}://${req.get("host")}`;
 }
 
+function photoUrls(req: Request, sound: Pick<SoundLean, "_id" | "photos">): string[] {
+  return (sound.photos ?? []).map((photo) => `${origin(req)}/sounds/${sound._id.toString()}/photos/${photo.fileId.toString()}`);
+}
+
 function publicSound(
   req: Request,
   sound: SoundLean,
@@ -91,6 +102,7 @@ function publicSound(
     playCount: sound.playCount,
     // Audio stored by this API is saved as a relative path; make it absolute for the client.
     audioUrl: sound.audioUrl.startsWith("/") ? `${origin(req)}${sound.audioUrl}` : sound.audioUrl,
+    photos: photoUrls(req, sound),
     createdAt: sound.createdAt.toISOString(),
     author: author ?? null,
     mine: req.auth?.userId === sound.userId.toString(),
@@ -115,16 +127,21 @@ async function authorsById(ids: mongoose.Types.ObjectId[]): Promise<Map<string, 
 }
 
 /** Runs multer for one request and turns its errors into JSON responses. */
-function receiveAudio(req: Request, res: Response): Promise<boolean> {
+function receiveFile(
+  req: Request,
+  res: Response,
+  receive: ReturnType<typeof upload.single>,
+  tooLarge: string
+): Promise<boolean> {
   return new Promise((resolve) => {
-    upload.single("audio")(req, res, (error: unknown) => {
+    receive(req, res, (error: unknown) => {
       if (!error) {
         resolve(true);
         return;
       }
 
       if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
-        res.status(413).json({ error: `Audio must be under ${MAX_AUDIO_BYTES / (1024 * 1024)} MB.` });
+        res.status(413).json({ error: tooLarge });
       } else {
         res.status(400).json({ error: "Could not read the upload." });
       }
@@ -140,7 +157,7 @@ router.post("/", requireAuth, async (req, res) => {
     return;
   }
 
-  if (!(await receiveAudio(req, res))) {
+  if (!(await receiveFile(req, res, upload.single("audio"), `Audio must be under ${MAX_AUDIO_BYTES / (1024 * 1024)} MB.`))) {
     return;
   }
 
@@ -353,6 +370,126 @@ router.get("/:id/audio", async (req, res) => {
   stream.on("error", () => {
     if (!res.headersSent) {
       res.status(500).json({ error: "Could not read audio." });
+    } else {
+      res.destroy();
+    }
+  });
+
+  stream.pipe(res);
+});
+
+/** Add a photo of the place (multipart `photo`: JPEG, PNG or WebP). Only the sound's uploader may add photos. */
+router.post("/:id/photos", requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Sound not found." });
+    return;
+  }
+
+  const soundId = new mongoose.Types.ObjectId(req.params.id);
+  const userId = new mongoose.Types.ObjectId(req.auth?.userId);
+  const sound = await SoundModel.findById(soundId, "userId photos").lean();
+
+  if (!sound) {
+    res.status(404).json({ error: "Sound not found." });
+    return;
+  }
+
+  if (!sound.userId.equals(userId)) {
+    res.status(403).json({ error: "Only the uploader can add photos." });
+    return;
+  }
+
+  if ((sound.photos?.length ?? 0) >= MAX_PHOTOS_PER_SOUND) {
+    res.status(409).json({ error: `A Toone can have at most ${MAX_PHOTOS_PER_SOUND} photos.` });
+    return;
+  }
+
+  if (!(await receiveFile(req, res, photoUpload.single("photo"), `Photos must be under ${MAX_PHOTO_BYTES / (1024 * 1024)} MB.`))) {
+    return;
+  }
+
+  if (!req.file) {
+    res.status(400).json({ error: "A photo file is required." });
+    return;
+  }
+
+  const mime = sniffImageMime(req.file.buffer);
+
+  if (!mime) {
+    res.status(400).json({ error: "Photos must be JPEG, PNG or WebP." });
+    return;
+  }
+
+  let fileId: mongoose.Types.ObjectId | undefined;
+
+  try {
+    fileId = await storePhoto(req.file.buffer, `${soundId.toString()}.${mime.split("/")[1]}`, mime);
+
+    // The size check is repeated in the update so two parallel uploads cannot exceed the limit.
+    const updated = await SoundModel.findOneAndUpdate(
+      { _id: soundId, userId, [`photos.${MAX_PHOTOS_PER_SOUND - 1}`]: { $exists: false } },
+      { $push: { photos: { fileId, mime } } },
+      { new: true, projection: "photos" }
+    ).lean();
+
+    if (!updated) {
+      await deletePhoto(fileId);
+      res.status(409).json({ error: `A Toone can have at most ${MAX_PHOTOS_PER_SOUND} photos.` });
+      return;
+    }
+
+    res.status(201).json({ photos: photoUrls(req, updated as unknown as Pick<SoundLean, "_id" | "photos">) });
+  } catch {
+    if (fileId) {
+      await deletePhoto(fileId);
+    }
+
+    res.status(500).json({ error: "Could not save photo." });
+  }
+});
+
+/** Stream one photo. Public, so a plain <img> works. */
+router.get("/:id/photos/:photoId", async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.photoId)) {
+    res.status(404).json({ error: "Photo not found." });
+    return;
+  }
+
+  const sound = await SoundModel.findById(req.params.id, "photos").lean();
+  const photo = sound?.photos?.find((entry) => entry.fileId.toString() === req.params.photoId);
+
+  if (!photo) {
+    res.status(404).json({ error: "Photo not found." });
+    return;
+  }
+
+  const length = await photoLength(photo.fileId);
+
+  if (length === null) {
+    res.status(404).json({ error: "Photo not found." });
+    return;
+  }
+
+  res.set({
+    "Content-Type": photo.mime,
+    "Content-Length": String(length),
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "public, max-age=31536000, immutable"
+  });
+
+  const stream = openPhoto(photo.fileId);
+
+  stream.on("error", () => {
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Could not read photo." });
     } else {
       res.destroy();
     }

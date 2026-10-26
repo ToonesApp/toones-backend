@@ -17,7 +17,7 @@ const seedUsers = [
   { username: "sana", displayName: "Sana Iqbal" }
 ];
 
-type SeedSound = Omit<Sound, "userId" | "playCount" | "createdAt" | "updatedAt"> & {
+type SeedSound = Omit<Sound, "userId" | "photos" | "playCount" | "createdAt" | "updatedAt"> & {
   username: string;
 };
 
