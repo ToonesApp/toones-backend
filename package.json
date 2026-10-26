@@ -12,7 +12,8 @@
     "dev": "npm run build && node dist/index.js",
     "build": "tsc",
     "start": "node dist/index.js",
-    "seed": "npm run build && node dist/db/seed.js"
+    "seed": "npm run build && node dist/db/seed.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -31,6 +32,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.3.0",
     "@types/node": "^22.10.7",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.12"
   }
 }
