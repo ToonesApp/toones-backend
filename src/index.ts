@@ -7,6 +7,7 @@ import authRouter from "./routes/auth.js";
 import friendsRouter from "./routes/friends.js";
 import healthRouter from "./routes/health.js";
 import soundsRouter from "./routes/sounds.js";
+import usersRouter from "./routes/users.js";
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.use("/auth", authRouter);
 app.use("/friends", friendsRouter);
 app.use("/health", healthRouter);
 app.use("/sounds", soundsRouter);
+app.use("/users", usersRouter);
 
 app.listen(env.port, () => {
   console.log(`Toones API listening on port ${env.port}.`);

@@ -1,5 +1,6 @@
 import mongoose, { type HydratedDocument, type Model } from "mongoose";
 
+import { MAX_BIO_LENGTH } from "../lib/bio.js";
 import type { Look } from "../lib/look.js";
 import { levelFromXp } from "../lib/xp.js";
 
@@ -16,6 +17,8 @@ export interface User {
   xp: number;
   /** The user's dress-up character; absent until they save one. */
   look?: Look;
+  /** A short line about the user, shown on their profile. */
+  bio?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,6 +66,11 @@ const userSchema = new Schema<User, Model<User, object, object, UserVirtuals>, o
       type: Number,
       default: 0,
       min: 0
+    },
+    bio: {
+      type: String,
+      trim: true,
+      maxlength: MAX_BIO_LENGTH
     },
     look: {
       type: {

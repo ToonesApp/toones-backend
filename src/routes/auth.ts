@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
 import { isMongoConnected } from "../db/connect.js";
+import { MAX_BIO_LENGTH, parseBio } from "../lib/bio.js";
 import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
@@ -83,6 +84,7 @@ function publicUser(user: UserDocument) {
     xp: user.xp,
     level: user.level,
     look: user.look ? plainLook(user.look) : null,
+    bio: user.bio ?? "",
     createdAt: user.createdAt.toISOString()
   };
 }
@@ -301,6 +303,36 @@ router.get("/me", requireAuth, async (req, res) => {
   }
 
   res.status(200).json({ user: publicUser(user) });
+});
+
+/** Saves the signed-in user's bio. An empty string clears it. */
+router.put("/me/bio", requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  const bio = parseBio((req.body as { bio?: unknown } | undefined)?.bio);
+
+  if (bio === null) {
+    res.status(400).json({ error: `Your bio must be ${MAX_BIO_LENGTH} characters or fewer.` });
+    return;
+  }
+
+  try {
+    const user = await UserModel.findById(req.auth?.userId);
+
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    user.bio = bio;
+    await user.save();
+
+    res.status(200).json({ user: publicUser(user) });
+  } catch {
+    res.status(500).json({ error: "Could not save your bio." });
+  }
 });
 
 /** Saves the signed-in user's character. Rejects unknown parts and anything the user hasn't unlocked yet. */
