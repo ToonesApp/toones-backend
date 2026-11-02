@@ -23,7 +23,7 @@
     "google-auth-library": "^11.3.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.9.5",
-    "multer": "^2.4.0"
+    "multer": "^2.5.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
