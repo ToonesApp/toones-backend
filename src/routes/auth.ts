@@ -7,6 +7,7 @@ import { env } from "../config/env.js";
 import { isMongoConnected } from "../db/connect.js";
 import { MAX_BIO_LENGTH, parseBio } from "../lib/bio.js";
 import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
+import { googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel } from "../models/Sound.js";
@@ -118,7 +119,7 @@ function ensureMongo(res: Response): boolean {
   return false;
 }
 
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }
@@ -185,7 +186,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }
@@ -224,7 +225,7 @@ router.post("/login", async (req, res) => {
  * The token is verified against our client id; an account is matched by Google id, then by
  * verified email, and created if neither exists.
  */
-router.post("/google", async (req, res) => {
+router.post("/google", googleLimiter, async (req, res) => {
   if (!env.googleClientId) {
     res.status(503).json({ error: "Google sign-in is not configured." });
     return;

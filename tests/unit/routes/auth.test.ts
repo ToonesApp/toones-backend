@@ -8,6 +8,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 vi.mock("../../../src/config/env.js", () => ({ env: { jwtSecret: "test-secret", googleClientId: "" } }));
 vi.mock("../../../src/db/connect.js", () => ({ isMongoConnected: () => true }));
+// Rate limits have their own tests (RATE-*); here they would block the repeated validation requests.
+vi.mock("../../../src/middleware/rateLimit.js", () => {
+  const pass = (_req: unknown, _res: unknown, next: () => void) => next();
+  return { loginLimiter: pass, registerLimiter: pass, googleLimiter: pass };
+});
 vi.mock("../../../src/models/User.js", () => ({
   UserModel: { findOne: vi.fn(), create: vi.fn(), exists: vi.fn() }
 }));
