@@ -15,6 +15,10 @@ export interface User {
   /** Google's stable subject id; present once the account is linked to Google. */
   googleId?: string;
   xp: number;
+  /** True once the owner proved they control the email (via link or Google). Absent on older accounts. */
+  emailVerified?: boolean;
+  /** Set when the password is reset; sessions issued before this are rejected. */
+  passwordChangedAt?: Date;
   /** The user's dress-up character; absent until they save one. */
   look?: Look;
   /** A short line about the user, shown on their profile. */
@@ -66,6 +70,12 @@ const userSchema = new Schema<User, Model<User, object, object, UserVirtuals>, o
       type: Number,
       default: 0,
       min: 0
+    },
+    emailVerified: {
+      type: Boolean
+    },
+    passwordChangedAt: {
+      type: Date
     },
     bio: {
       type: String,
