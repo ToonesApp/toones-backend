@@ -4,7 +4,12 @@ import type { Server } from "node:http";
 import express from "express";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { loginLimiter, registerLimiter } from "../../../src/middleware/rateLimit.js";
+import {
+  deleteAccountLimiter,
+  deleteSoundLimiter,
+  loginLimiter,
+  registerLimiter
+} from "../../../src/middleware/rateLimit.js";
 
 let server: Server;
 let baseUrl: string;
@@ -29,6 +34,12 @@ beforeAll(async () => {
   });
   app.post("/register", registerLimiter, (_req, res) => {
     res.status(201).json({});
+  });
+  app.post("/delete-account", deleteAccountLimiter, (req, res) => {
+    res.status(req.body.correct ? 200 : 403).json({});
+  });
+  app.post("/delete-sound", deleteSoundLimiter, (_req, res) => {
+    res.status(200).json({});
   });
   server = app.listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
@@ -64,5 +75,24 @@ describe("auth rate limits", () => {
 
     expect((await post("/register", "203.0.113.3")).status).toBe(429);
     expect((await post("/register", "203.0.113.4")).status).toBe(201);
+  });
+
+  it("[RATE-04] should block the 6th wrong password on account delete, even when the next one is right", async () => {
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
+      expect((await post("/delete-account", "203.0.113.5")).status).toBe(403);
+    }
+
+    const blocked = await post("/delete-account", "203.0.113.5", { correct: true });
+
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error).toMatch(/too many attempts to delete/i);
+  });
+
+  it("[RATE-05] should allow 60 drop deletes from one IP in 15 minutes and block the 61st", async () => {
+    for (let attempt = 1; attempt <= 60; attempt += 1) {
+      expect((await post("/delete-sound", "203.0.113.6")).status).toBe(200);
+    }
+
+    expect((await post("/delete-sound", "203.0.113.6")).status).toBe(429);
   });
 });

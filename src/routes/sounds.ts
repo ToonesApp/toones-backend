@@ -6,7 +6,9 @@ import { isMongoConnected } from "../db/connect.js";
 import { MAX_AUDIO_BYTES, audioLength, deleteAudio, normalizeAudioMime, openAudio, storeAudio } from "../lib/audio.js";
 import { plainLook, type Look } from "../lib/look.js";
 import { MAX_PHOTOS_PER_SOUND, MAX_PHOTO_BYTES, deletePhoto, openPhoto, photoLength, sniffImageMime, storePhoto } from "../lib/photo.js";
+import { removeSounds } from "../lib/removeSounds.js";
 import { XP_PER_DROP, XP_PER_LISTEN } from "../lib/xp.js";
+import { deleteSoundLimiter } from "../middleware/rateLimit.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel, soundCategories, type SoundCategory } from "../models/Sound.js";
@@ -449,6 +451,45 @@ router.post("/:id/photos", requireAuth, async (req, res) => {
     }
 
     res.status(500).json({ error: "Could not save photo." });
+  }
+});
+
+/** Delete your own Toone with its listens, audio and photos. The drop XP it earned is taken back, never below 0. */
+router.delete("/:id", deleteSoundLimiter, requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Sound not found." });
+    return;
+  }
+
+  const userId = new mongoose.Types.ObjectId(req.auth?.userId);
+  const sound = await SoundModel.findById(req.params.id, "userId audioFileId photos").lean();
+
+  if (!sound) {
+    res.status(404).json({ error: "Sound not found." });
+    return;
+  }
+
+  if (!sound.userId.equals(userId)) {
+    res.status(403).json({ error: "Only the uploader can delete this Toone." });
+    return;
+  }
+
+  try {
+    await removeSounds([sound]);
+
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      [{ $set: { xp: { $max: [0, { $subtract: ["$xp", XP_PER_DROP] }] } } }],
+      { new: true }
+    );
+
+    res.status(200).json({ deleted: true, xp: user?.xp ?? 0, level: user?.level ?? 1 });
+  } catch {
+    res.status(500).json({ error: "Could not delete sound." });
   }
 });
 

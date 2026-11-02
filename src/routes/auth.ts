@@ -7,8 +7,10 @@ import { env } from "../config/env.js";
 import { isMongoConnected } from "../db/connect.js";
 import { MAX_BIO_LENGTH, parseBio } from "../lib/bio.js";
 import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
-import { googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
+import { removeSounds } from "../lib/removeSounds.js";
+import { deleteAccountLimiter, googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { FollowModel } from "../models/Follow.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel } from "../models/Sound.js";
 import { UserModel, type UserDocument } from "../models/User.js";
@@ -393,6 +395,51 @@ router.put("/me/look", requireAuth, async (req, res) => {
     res.status(200).json({ user: publicUser(user) });
   } catch {
     res.status(500).json({ error: "Could not save your character." });
+  }
+});
+
+/**
+ * Permanently deletes the signed-in user with their drops (and those drops' files and listens),
+ * their listens on other drops, and their friend links. Password accounts must confirm with
+ * their current password; Google-only accounts have none, so the session is enough.
+ * Listeners keep the XP they earned from the deleted drops.
+ */
+router.delete("/me", deleteAccountLimiter, requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  const rawPassword = stringValue((req.body as { password?: unknown } | undefined)?.password);
+
+  try {
+    const user = await UserModel.findById(req.auth?.userId).select("+passwordHash");
+
+    if (!user) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    if (user.passwordHash) {
+      if (!rawPassword) {
+        res.status(400).json({ error: "Enter your password to delete your account." });
+        return;
+      }
+
+      if (!(await bcrypt.compare(rawPassword, user.passwordHash))) {
+        res.status(403).json({ error: "That password is incorrect." });
+        return;
+      }
+    }
+
+    const sounds = await SoundModel.find({ userId: user._id }, "audioFileId photos").lean();
+    await removeSounds(sounds);
+    await ListenModel.deleteMany({ userId: user._id });
+    await FollowModel.deleteMany({ $or: [{ followerId: user._id }, { followingId: user._id }] });
+    await UserModel.deleteOne({ _id: user._id });
+
+    res.status(200).json({ deleted: true });
+  } catch {
+    res.status(500).json({ error: "Could not delete your account." });
   }
 });
 
