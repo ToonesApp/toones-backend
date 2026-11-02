@@ -7,9 +7,10 @@ import { MAX_AUDIO_BYTES, audioLength, deleteAudio, normalizeAudioMime, openAudi
 import { plainLook, type Look } from "../lib/look.js";
 import { MAX_PHOTOS_PER_SOUND, MAX_PHOTO_BYTES, deletePhoto, openPhoto, photoLength, sniffImageMime, storePhoto } from "../lib/photo.js";
 import { removeSounds } from "../lib/removeSounds.js";
-import { XP_PER_DROP, XP_PER_LISTEN } from "../lib/xp.js";
-import { deleteSoundLimiter, likeLimiter } from "../middleware/rateLimit.js";
+import { XP_PER_DROP, XP_PER_LISTEN, levelFromXp } from "../lib/xp.js";
+import { deleteSoundLimiter, likeLimiter, likersLimiter } from "../middleware/rateLimit.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
+import { FollowModel } from "../models/Follow.js";
 import { LikeModel } from "../models/Like.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel, soundCategories, type SoundCategory } from "../models/Sound.js";
@@ -29,6 +30,8 @@ const photoUpload = multer({
 
 const defaultFeedLimit = 100;
 const maxFeedLimit = 200;
+const defaultLikersLimit = 50;
+const maxLikersLimit = 100;
 const maxTags = 8;
 
 type SoundLean = {
@@ -683,6 +686,83 @@ router.delete("/:id/like", likeLimiter, requireAuth, async (req, res) => {
     res.status(200).json({ liked: false, likeCount });
   } catch {
     res.status(500).json({ error: "Could not unlike sound." });
+  }
+});
+
+/**
+ * Who liked a sound, newest first (the "liked by" list). Same person shape as /friends, so the client can
+ * show Follow buttons. Optional query: `limit`, and `before` (ISO date cursor from `nextBefore`).
+ */
+router.get("/:id/likes", likersLimiter, requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Sound not found." });
+    return;
+  }
+
+  const soundId = new mongoose.Types.ObjectId(req.params.id);
+  const me = req.auth?.userId;
+  const filter: Record<string, unknown> = { soundId };
+  const before = new Date(text(req.query.before));
+
+  if (!Number.isNaN(before.getTime())) {
+    filter.createdAt = { $lt: before };
+  }
+
+  const requested = Number(req.query.limit);
+  const limit = Number.isFinite(requested) ? Math.min(Math.max(Math.floor(requested), 1), maxLikersLimit) : defaultLikersLimit;
+
+  try {
+    if (!(await SoundModel.exists({ _id: soundId }))) {
+      res.status(404).json({ error: "Sound not found." });
+      return;
+    }
+
+    const likes = await LikeModel.find(filter, "userId createdAt").sort({ createdAt: -1 }).limit(limit).lean();
+    const ids = likes.map((like) => like.userId);
+    const [users, following, followers] = await Promise.all([
+      UserModel.find({ _id: { $in: ids } }, "username displayName xp look").lean(),
+      FollowModel.find({ followerId: me, followingId: { $in: ids } }, "followingId").lean(),
+      FollowModel.find({ followingId: me, followerId: { $in: ids } }, "followerId").lean()
+    ]);
+
+    const usersById = new Map(users.map((user) => [user._id.toString(), user]));
+    const youFollow = new Set(following.map((row) => row.followingId.toString()));
+    const followsYou = new Set(followers.map((row) => row.followerId.toString()));
+
+    const people = likes.flatMap((like) => {
+      const id = like.userId.toString();
+      const user = usersById.get(id);
+
+      if (!user) {
+        return [];
+      }
+
+      return [
+        {
+          id,
+          username: user.username,
+          displayName: user.displayName,
+          level: levelFromXp(user.xp ?? 0),
+          look: user.look ? plainLook(user.look) : null,
+          following: youFollow.has(id),
+          followsYou: followsYou.has(id),
+          likedAt: like.createdAt.toISOString()
+        }
+      ];
+    });
+
+    const last = likes[likes.length - 1];
+
+    res.status(200).json({
+      people,
+      nextBefore: likes.length === limit && last ? last.createdAt.toISOString() : null
+    });
+  } catch {
+    res.status(500).json({ error: "Could not load likes." });
   }
 });
 

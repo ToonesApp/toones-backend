@@ -34,3 +34,5 @@ export const deleteSoundLimiter = limiter(15 * MINUTE, 60, "Too many deletes. Tr
 
 /** Shared by like and unlike; high enough for fast scrolling and tapping through a feed. */
 export const likeLimiter = limiter(15 * MINUTE, 300, "Too many likes. Try again in a few minutes.");
+
+export const likersLimiter = limiter(15 * MINUTE, 300, "Too many requests. Try again in a few minutes.");
