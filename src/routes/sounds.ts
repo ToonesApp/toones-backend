@@ -8,8 +8,9 @@ import { plainLook, type Look } from "../lib/look.js";
 import { MAX_PHOTOS_PER_SOUND, MAX_PHOTO_BYTES, deletePhoto, openPhoto, photoLength, sniffImageMime, storePhoto } from "../lib/photo.js";
 import { removeSounds } from "../lib/removeSounds.js";
 import { XP_PER_DROP, XP_PER_LISTEN } from "../lib/xp.js";
-import { deleteSoundLimiter } from "../middleware/rateLimit.js";
+import { deleteSoundLimiter, likeLimiter } from "../middleware/rateLimit.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
+import { LikeModel } from "../models/Like.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel, soundCategories, type SoundCategory } from "../models/Sound.js";
 import { UserModel } from "../models/User.js";
@@ -43,6 +44,8 @@ type SoundLean = {
   placeName?: string;
   photos?: { fileId: mongoose.Types.ObjectId; mime: string }[];
   playCount: number;
+  /** Missing on sounds saved before likes existed. */
+  likeCount?: number;
   createdAt: Date;
 };
 
@@ -87,7 +90,8 @@ function publicSound(
   req: Request,
   sound: SoundLean,
   author: Author | undefined,
-  listened: boolean
+  listened: boolean,
+  liked: boolean
 ) {
   const [lon, lat] = sound.location.coordinates;
 
@@ -102,13 +106,15 @@ function publicSound(
     lat,
     placeName: sound.placeName ?? "",
     playCount: sound.playCount,
+    likeCount: sound.likeCount ?? 0,
     // Audio stored by this API is saved as a relative path; make it absolute for the client.
     audioUrl: sound.audioUrl.startsWith("/") ? `${origin(req)}${sound.audioUrl}` : sound.audioUrl,
     photos: photoUrls(req, sound),
     createdAt: sound.createdAt.toISOString(),
     author: author ?? null,
     mine: req.auth?.userId === sound.userId.toString(),
-    listened
+    listened,
+    liked
   };
 }
 
@@ -240,7 +246,7 @@ router.post("/", requireAuth, async (req, res) => {
     const authors = await authorsById([userId]);
 
     res.status(201).json({
-      sound: publicSound(req, sound.toObject() as unknown as SoundLean, authors.get(userId.toString()), false),
+      sound: publicSound(req, sound.toObject() as unknown as SoundLean, authors.get(userId.toString()), false, false),
       xp: user?.xp ?? 0,
       level: user?.level ?? 1
     });
@@ -297,15 +303,21 @@ router.get("/", optionalAuth, async (req, res) => {
     const authors = await authorsById([...new Set(sounds.map((sound) => sound.userId.toString()))].map((id) => new mongoose.Types.ObjectId(id)));
 
     const listened = new Set<string>();
+    const liked = new Set<string>();
 
     if (req.auth?.userId && sounds.length > 0) {
-      const listens = await ListenModel.find(
-        { userId: req.auth.userId, soundId: { $in: sounds.map((sound) => sound._id) } },
-        "soundId"
-      ).lean();
+      const mine = { userId: req.auth.userId, soundId: { $in: sounds.map((sound) => sound._id) } };
+      const [listens, likes] = await Promise.all([
+        ListenModel.find(mine, "soundId").lean(),
+        LikeModel.find(mine, "soundId").lean()
+      ]);
 
       for (const listen of listens) {
         listened.add(listen.soundId.toString());
+      }
+
+      for (const like of likes) {
+        liked.add(like.soundId.toString());
       }
     }
 
@@ -313,7 +325,13 @@ router.get("/", optionalAuth, async (req, res) => {
 
     res.status(200).json({
       sounds: sounds.map((sound) =>
-        publicSound(req, sound, authors.get(sound.userId.toString()), listened.has(sound._id.toString()))
+        publicSound(
+          req,
+          sound,
+          authors.get(sound.userId.toString()),
+          listened.has(sound._id.toString()),
+          liked.has(sound._id.toString())
+        )
       ),
       nextBefore: sounds.length === limit && last ? last.createdAt.toISOString() : null
     });
@@ -585,6 +603,86 @@ router.post("/:id/listen", requireAuth, async (req, res) => {
     });
   } catch {
     res.status(500).json({ error: "Could not record listen." });
+  }
+});
+
+/** Like a sound (Instagram-style heart). Safe to repeat: a second like is a no-op, never a second count. */
+router.put("/:id/like", likeLimiter, requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Sound not found." });
+    return;
+  }
+
+  const soundId = new mongoose.Types.ObjectId(req.params.id);
+  const userId = new mongoose.Types.ObjectId(req.auth?.userId);
+
+  try {
+    const sound = await SoundModel.findById(soundId, "likeCount").lean();
+
+    if (!sound) {
+      res.status(404).json({ error: "Sound not found." });
+      return;
+    }
+
+    let likeCount = sound.likeCount ?? 0;
+
+    try {
+      await LikeModel.create({ userId, soundId });
+      const updated = await SoundModel.findByIdAndUpdate(soundId, { $inc: { likeCount: 1 } }, { new: true, projection: "likeCount" }).lean();
+      likeCount = updated?.likeCount ?? likeCount + 1;
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) {
+        throw error;
+      }
+    }
+
+    res.status(200).json({ liked: true, likeCount });
+  } catch {
+    res.status(500).json({ error: "Could not like sound." });
+  }
+});
+
+/** Unlike a sound. Safe to repeat: unliking something you haven't liked changes nothing. */
+router.delete("/:id/like", likeLimiter, requireAuth, async (req, res) => {
+  if (!ensureMongo(res)) {
+    return;
+  }
+
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(404).json({ error: "Sound not found." });
+    return;
+  }
+
+  const soundId = new mongoose.Types.ObjectId(req.params.id);
+  const userId = new mongoose.Types.ObjectId(req.auth?.userId);
+
+  try {
+    const sound = await SoundModel.findById(soundId, "likeCount").lean();
+
+    if (!sound) {
+      res.status(404).json({ error: "Sound not found." });
+      return;
+    }
+
+    let likeCount = sound.likeCount ?? 0;
+    const { deletedCount } = await LikeModel.deleteOne({ userId, soundId });
+
+    if (deletedCount > 0) {
+      const updated = await SoundModel.findOneAndUpdate(
+        { _id: soundId, likeCount: { $gt: 0 } },
+        { $inc: { likeCount: -1 } },
+        { new: true, projection: "likeCount" }
+      ).lean();
+      likeCount = updated?.likeCount ?? 0;
+    }
+
+    res.status(200).json({ liked: false, likeCount });
+  } catch {
+    res.status(500).json({ error: "Could not unlike sound." });
   }
 });
 
