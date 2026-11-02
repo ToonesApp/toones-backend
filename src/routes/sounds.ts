@@ -8,6 +8,7 @@ import { plainLook, type Look } from "../lib/look.js";
 import { MAX_PHOTOS_PER_SOUND, MAX_PHOTO_BYTES, deletePhoto, openPhoto, photoLength, sniffImageMime, storePhoto } from "../lib/photo.js";
 import { removeSounds } from "../lib/removeSounds.js";
 import { XP_PER_DROP, XP_PER_LISTEN } from "../lib/xp.js";
+import { deleteSoundLimiter } from "../middleware/rateLimit.js";
 import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel, soundCategories, type SoundCategory } from "../models/Sound.js";
@@ -454,7 +455,7 @@ router.post("/:id/photos", requireAuth, async (req, res) => {
 });
 
 /** Delete your own Toone with its listens, audio and photos. The drop XP it earned is taken back, never below 0. */
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", deleteSoundLimiter, requireAuth, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }

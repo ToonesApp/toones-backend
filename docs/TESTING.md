@@ -14,7 +14,7 @@ Four people commit to the same backend. Without automated tests, one person's ch
 |---|---|
 | Login protection on private routes | Likes, comments, saves (not built yet) |
 | Sign-up and login rules (email, username, password) | Transcription and audio classification (not built yet) |
-| Rate limits on sign-up and login | Frontend UI, map rendering, microphone (need a real browser) |
+| Rate limits on sign-up, login, and deletes | Frontend UI, map rendering, microphone (need a real browser) |
 | Map pin coordinate limits | Full API requests against a real database (Phase 2) |
 | Clip length, category, and audio upload types | |
 | Profile bio rules | |
@@ -53,6 +53,8 @@ IDs: **AUTH** = login and sign-up, **RATE** = rate limits, **VAL** = request for
 | RATE-01 | 11th failed login from the same IP within 15 minutes | Blocked with 429 and a JSON error, even with the right password | Pass |
 | RATE-02 | 15 successful logins in a row from the same IP | Never blocked (only failures count) | Pass |
 | RATE-03 | 6th sign-up from the same IP within an hour; sign-up from another IP | 6th blocked with 429; the other IP still allowed | Pass |
+| RATE-04 | 6th account-delete attempt after 5 wrong passwords within 15 minutes | Blocked with 429, even with the right password | Pass |
+| RATE-05 | 61st drop delete from the same IP within 15 minutes | First 60 allowed, 61st blocked with 429 | Pass |
 | VAL-01 | Request with a malformed JSON body | 400 with a JSON error, not an HTML page | Pass |
 | VAL-02 | Request body over the 100 KB limit | 413 with a JSON error | Pass |
 | GEO-01 | Pin beyond ±180 longitude or ±90 latitude; pin exactly on the edges | Out of range rejected, exact edges accepted | Pass |
@@ -76,7 +78,7 @@ IDs: **AUTH** = login and sign-up, **RATE** = rate limits, **VAL** = request for
 
 ## Results
 
-- **37 of 37 passing** locally (Nov 2, 2026). CI runs them on every pull request.
+- **39 of 39 passing** locally (Nov 2, 2026). CI runs them on every pull request.
 - **Oct 27 demo:** [PR #7](https://github.com/ToonesApp/toones-backend/pull/7) showed "1 check passed" before merge. [CI test log](https://github.com/ToonesApp/toones-backend/actions/runs/40350296263): open the `tests` job, then "Unit tests", to see each test by ID.
 - **Proof the tests catch bugs:**
   - Changing the clip limit from 60 s to 61 s made UPL-01 fail.

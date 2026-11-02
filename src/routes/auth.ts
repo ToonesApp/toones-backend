@@ -8,7 +8,7 @@ import { isMongoConnected } from "../db/connect.js";
 import { MAX_BIO_LENGTH, parseBio } from "../lib/bio.js";
 import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
 import { removeSounds } from "../lib/removeSounds.js";
-import { googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
+import { deleteAccountLimiter, googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { FollowModel } from "../models/Follow.js";
 import { ListenModel } from "../models/Listen.js";
@@ -404,7 +404,7 @@ router.put("/me/look", requireAuth, async (req, res) => {
  * their current password; Google-only accounts have none, so the session is enough.
  * Listeners keep the XP they earned from the deleted drops.
  */
-router.delete("/me", requireAuth, async (req, res) => {
+router.delete("/me", deleteAccountLimiter, requireAuth, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }

@@ -21,3 +21,13 @@ export const loginLimiter = limiter(15 * MINUTE, 10, "Too many login attempts. T
 export const registerLimiter = limiter(60 * MINUTE, 5, "Too many sign-ups from this network. Try again in an hour.");
 
 export const googleLimiter = limiter(15 * MINUTE, 20, "Too many Google sign-in attempts. Try again in 15 minutes.");
+
+/** Only failed attempts count, so someone holding a stolen token can't keep guessing the password. */
+export const deleteAccountLimiter = limiter(
+  15 * MINUTE,
+  5,
+  "Too many attempts to delete this account. Try again in 15 minutes.",
+  true
+);
+
+export const deleteSoundLimiter = limiter(15 * MINUTE, 60, "Too many deletes. Try again in a few minutes.");
