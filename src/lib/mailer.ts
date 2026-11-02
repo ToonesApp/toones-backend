@@ -86,3 +86,23 @@ export function passwordChangedEmail(to: string, displayName: string): Email {
       `<p>If it wasn't, reset it again right away from the sign-in page.</p></div>`
   };
 }
+/** The "confirm your email" message sent after sign-up. */
+export function verificationEmail(to: string, displayName: string, link: string, hours: number): Email {
+  const name = escapeHtml(displayName);
+  const url = escapeHtml(link);
+
+  return {
+    to,
+    subject: "Confirm your Toones email",
+    text:
+      `Hi ${displayName},\n\nWelcome to Toones! Confirm this is your email address (the link works once and expires in ${hours} hours):\n\n` +
+      `${link}\n\nIf you didn't create an account, ignore this email.\n\n— Toones`,
+    html:
+      `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f1f1f">` +
+      `<h2 style="margin:0 0 12px">Confirm your email</h2><p>Hi ${name}, welcome to Toones!</p>` +
+      `<p>Confirm this is your email address. The link works once and expires in ${hours} hours.</p>` +
+      `<p style="margin:24px 0"><a href="${url}" style="background:#1f1f1f;color:#fff;padding:12px 22px;border-radius:999px;text-decoration:none;font-weight:600">Confirm email</a></p>` +
+      `<p style="font-size:13px;color:#666">Or paste this into your browser:<br>${url}</p>` +
+      `<p style="font-size:13px;color:#666">If you didn't create an account, ignore this email.</p></div>`
+  };
+}

@@ -13,6 +13,7 @@ vi.mock("../../../src/middleware/rateLimit.js", () => {
   const pass = (_req: unknown, _res: unknown, next: () => void) => next();
   return { loginLimiter: pass, registerLimiter: pass, googleLimiter: pass };
 });
+vi.mock("../../../src/lib/emailVerification.js", () => ({ issueVerificationEmail: vi.fn(async () => true) }));
 vi.mock("../../../src/models/User.js", () => ({
   UserModel: { findOne: vi.fn(), create: vi.fn(), exists: vi.fn() }
 }));

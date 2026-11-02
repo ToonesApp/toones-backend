@@ -4,7 +4,9 @@ import express from "express";
 import { env } from "./config/env.js";
 import { connectMongo } from "./db/connect.js";
 import { jsonBodyErrors } from "./middleware/jsonErrors.js";
+import { sessionRevocation } from "./middleware/sessionRevocation.js";
 import authRouter from "./routes/auth.js";
+import emailVerificationRouter from "./routes/emailVerification.js";
 import friendsRouter from "./routes/friends.js";
 import passwordResetRouter from "./routes/passwordReset.js";
 import healthRouter from "./routes/health.js";
@@ -24,8 +26,11 @@ app.use(
 );
 app.use(express.json());
 
+app.use(sessionRevocation);
+
 app.use("/auth", authRouter);
 app.use("/auth", passwordResetRouter);
+app.use("/auth", emailVerificationRouter);
 app.use("/friends", friendsRouter);
 app.use("/health", healthRouter);
 app.use("/sounds", soundsRouter);

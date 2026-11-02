@@ -27,3 +27,7 @@ export const forgotPasswordLimiter = limiter(60 * MINUTE, 5, "Too many reset req
 
 /** Guessing a reset token is infeasible, but cap attempts anyway. */
 export const resetPasswordLimiter = limiter(15 * MINUTE, 10, "Too many attempts. Try again in 15 minutes.");
+
+export const verifyEmailLimiter = limiter(15 * MINUTE, 20, "Too many attempts. Try again in 15 minutes.");
+
+export const resendVerificationLimiter = limiter(60 * MINUTE, 5, "Too many verification emails requested. Try again in an hour.");

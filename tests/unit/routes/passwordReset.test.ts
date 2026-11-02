@@ -139,6 +139,7 @@ describe("POST /auth/reset-password", () => {
     expect(res.status).toBe(200);
     expect(await bcrypt.compare("brand-new-pass", user.passwordHash)).toBe(true);
     expect(user.save).toHaveBeenCalled();
+    expect((user as { passwordChangedAt?: Date }).passwordChangedAt).toBeInstanceOf(Date); // signs out old sessions
     expect(resets.deleteMany).toHaveBeenCalledWith({ userId: "u1" });
     await vi.waitFor(() => expect(mail).toHaveBeenCalledTimes(1));
   });

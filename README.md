@@ -47,6 +47,9 @@ Create a local `.env` file when running the API.
 - `POST /auth/google`: sign in or sign up with a Google ID token (`{ credential }`) and return a JWT. Requires `GOOGLE_CLIENT_ID`; returns `503` when it is unset. Existing accounts are linked by verified email.
 - `POST /auth/forgot-password`: `{ email }`. Always answers `200` with the same message (so it can't reveal which emails have accounts) and, if the account exists, emails a single-use link that expires in 60 minutes. Only the newest link works, a second email within 60 seconds is skipped, and the endpoint is limited to 5 requests per IP per hour.
 - `POST /auth/reset-password`: `{ token, password }`. Consumes the token (only its SHA-256 hash is stored), sets the new password, voids other links and emails the owner a heads-up. Works for Google-only accounts too, which adds password sign-in.
+- `POST /auth/verify-email`: `{ token }`. Confirms the address from the link emailed at sign-up (single use, 24 hours, tied to the address it was sent to). No sign-in needed.
+- `POST /auth/resend-verification` (bearer token): sends a fresh link; `429` if one was sent in the last minute. Google sign-in and password reset also mark the email verified. Users include `emailVerified`; it is informational and doesn't block sign-in.
+- After a password reset, every session issued earlier is rejected with `401` (`passwordChangedAt` check in `sessionRevocation`).
 - `GET /auth/me`: return the current user from a bearer token
 
 Auth endpoints require MongoDB. If Mongo is offline, they return `503` while `/health` still works.

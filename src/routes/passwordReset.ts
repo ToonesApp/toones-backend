@@ -120,6 +120,9 @@ router.post("/reset-password", resetPasswordLimiter, async (req, res) => {
     }
 
     user.passwordHash = await bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
+    // Signs out every existing session (see sessionRevocation), and following the emailed link proves the address.
+    user.passwordChangedAt = new Date();
+    user.emailVerified = true;
     await user.save();
     // Any other outstanding links for this account are now void.
     await PasswordResetModel.deleteMany({ userId: user._id });
