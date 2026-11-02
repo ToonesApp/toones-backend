@@ -16,6 +16,11 @@ import { UserModel, type UserDocument } from "../models/User.js";
 const router = Router();
 const passwordSaltRounds = 12;
 const tokenExpiresIn = "7d";
+const MIN_PASSWORD_LENGTH = 8;
+/** bcrypt ignores everything past 72 bytes, so longer passwords would silently match shorter ones. */
+const MAX_PASSWORD_BYTES = 72;
+/** The longest email address the email standard allows; also caps the login field. */
+const MAX_EMAIL_LENGTH = 254;
 
 type RegisterBody = {
   email?: unknown;
@@ -131,7 +136,7 @@ router.post("/register", registerLimiter, async (req, res) => {
   const cleanedDisplayName = normalizeText(displayName);
   const rawPassword = stringValue(password);
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+  if (normalizedEmail.length > MAX_EMAIL_LENGTH || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
     res.status(400).json({ error: "A valid email is required." });
     return;
   }
@@ -146,8 +151,13 @@ router.post("/register", registerLimiter, async (req, res) => {
     return;
   }
 
-  if (rawPassword.length < 8) {
-    res.status(400).json({ error: "Password must be at least 8 characters." });
+  if (rawPassword.length < MIN_PASSWORD_LENGTH) {
+    res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+    return;
+  }
+
+  if (Buffer.byteLength(rawPassword, "utf8") > MAX_PASSWORD_BYTES) {
+    res.status(400).json({ error: `Password must be at most ${MAX_PASSWORD_BYTES} characters.` });
     return;
   }
 
@@ -200,24 +210,33 @@ router.post("/login", loginLimiter, async (req, res) => {
     return;
   }
 
-  const user = await UserModel.findOne({
-    $or: [{ email: login }, { username: login }]
-  }).select("+passwordHash");
-
-  // Google-only accounts have no password, so password login can never succeed for them.
-  if (!user || !user.passwordHash) {
-    res.status(401).json({ error: "Invalid credentials." });
+  if (login.length > MAX_EMAIL_LENGTH) {
+    res.status(400).json({ error: "Email/username is too long." });
     return;
   }
 
-  const isPasswordValid = await bcrypt.compare(rawPassword, user.passwordHash);
+  try {
+    const user = await UserModel.findOne({
+      $or: [{ email: login }, { username: login }]
+    }).select("+passwordHash");
 
-  if (!isPasswordValid) {
-    res.status(401).json({ error: "Invalid credentials." });
-    return;
+    // Google-only accounts have no password, so password login can never succeed for them.
+    if (!user || !user.passwordHash) {
+      res.status(401).json({ error: "Invalid credentials." });
+      return;
+    }
+
+    const isPasswordValid = await bcrypt.compare(rawPassword, user.passwordHash);
+
+    if (!isPasswordValid) {
+      res.status(401).json({ error: "Invalid credentials." });
+      return;
+    }
+
+    res.status(200).json({ token: signToken(user), user: publicUser(user) });
+  } catch {
+    res.status(500).json({ error: "Could not sign in." });
   }
-
-  res.status(200).json({ token: signToken(user), user: publicUser(user) });
 });
 
 /**

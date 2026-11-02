@@ -3,6 +3,7 @@ import express from "express";
 
 import { env } from "./config/env.js";
 import { connectMongo } from "./db/connect.js";
+import { jsonBodyErrors } from "./middleware/jsonErrors.js";
 import authRouter from "./routes/auth.js";
 import friendsRouter from "./routes/friends.js";
 import healthRouter from "./routes/health.js";
@@ -27,6 +28,8 @@ app.use("/friends", friendsRouter);
 app.use("/health", healthRouter);
 app.use("/sounds", soundsRouter);
 app.use("/users", usersRouter);
+
+app.use(jsonBodyErrors);
 
 app.listen(env.port, () => {
   console.log(`Toones API listening on port ${env.port}.`);

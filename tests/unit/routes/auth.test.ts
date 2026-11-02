@@ -110,6 +110,27 @@ describe("POST /auth/register", () => {
     expect(users.create).not.toHaveBeenCalled();
   });
 
+  it("[AUTH-11] should reject a password over 72 bytes (bcrypt's limit) and accept exactly 72", async () => {
+    const tooLong = await post("/register", { ...validSignup, password: "a".repeat(73) });
+    const emoji = await post("/register", { ...validSignup, password: "😀".repeat(19) }); // 19 characters, 76 bytes
+
+    expect(tooLong.status).toBe(400);
+    expect(tooLong.body.error).toMatch(/at most 72/);
+    expect(emoji.status).toBe(400);
+    expect(users.create).not.toHaveBeenCalled();
+
+    expect((await post("/register", { ...validSignup, password: "a".repeat(72) })).status).toBe(201);
+  });
+
+  it("[AUTH-12] should reject the signup with 400 when the email is longer than 254 characters", async () => {
+    const email = `${"a".repeat(243)}@example.com`; // 255 characters
+
+    const { status } = await post("/register", { ...validSignup, email });
+
+    expect(status).toBe(400);
+    expect(users.create).not.toHaveBeenCalled();
+  });
+
   it("[AUTH-08] should reject the signup with 409 when the email is already registered", async () => {
     users.findOne.mockReturnValue(query(fakeUser()) as never);
 
@@ -147,5 +168,21 @@ describe("POST /auth/login", () => {
     expect(wrongPassword.status).toBe(401);
     expect(unknownUser.status).toBe(401);
     expect(wrongPassword.body.error).toBe(unknownUser.body.error);
+  });
+
+  it("[AUTH-13] should reject a login over 254 characters with 400 without querying the database", async () => {
+    const { status } = await post("/login", { emailOrUsername: "a".repeat(255), password: "correct-horse" });
+
+    expect(status).toBe(400);
+    expect(users.findOne).not.toHaveBeenCalled();
+  });
+
+  it("[AUTH-14] should return a 500 JSON error instead of hanging when the database fails during login", async () => {
+    users.findOne.mockReturnValue({ select: () => Promise.reject(new Error("database down")) } as never);
+
+    const { status, body } = await post("/login", { emailOrUsername: "maya", password: "correct-horse" });
+
+    expect(status).toBe(500);
+    expect(body.error).toBe("Could not sign in.");
   });
 });
