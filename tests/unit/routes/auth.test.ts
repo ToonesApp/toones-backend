@@ -11,7 +11,7 @@ vi.mock("../../../src/db/connect.js", () => ({ isMongoConnected: () => true }));
 // Rate limits have their own tests (RATE-*); here they would block the repeated validation requests.
 vi.mock("../../../src/middleware/rateLimit.js", () => {
   const pass = (_req: unknown, _res: unknown, next: () => void) => next();
-  return { loginLimiter: pass, registerLimiter: pass, googleLimiter: pass };
+  return { loginLimiter: pass, registerLimiter: pass, googleLimiter: pass, deleteAccountLimiter: pass };
 });
 vi.mock("../../../src/lib/emailVerification.js", () => ({ issueVerificationEmail: vi.fn(async () => true) }));
 vi.mock("../../../src/models/User.js", () => ({
