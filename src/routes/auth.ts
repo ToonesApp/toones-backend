@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 
 import { env } from "../config/env.js";
 import { isMongoConnected } from "../db/connect.js";
+import { issueVerificationEmail } from "../lib/emailVerification.js";
 import { MAX_BIO_LENGTH, parseBio } from "../lib/bio.js";
 import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
 import { removeSounds } from "../lib/removeSounds.js";
@@ -92,6 +93,7 @@ function publicUser(user: UserDocument) {
     displayName: user.displayName,
     xp: user.xp,
     level: user.level,
+    emailVerified: user.emailVerified === true,
     look: user.look ? plainLook(user.look) : null,
     bio: user.bio ?? "",
     createdAt: user.createdAt.toISOString()
@@ -189,6 +191,11 @@ router.post("/register", registerLimiter, async (req, res) => {
     });
 
     res.status(201).json({ token: signToken(user), user: publicUser(user) });
+
+    // After replying: a mail outage must never block sign-up. The user can resend from the app.
+    issueVerificationEmail(user).catch((error: unknown) => {
+      console.error("Could not send verification email:", error instanceof Error ? error.message : error);
+    });
   } catch (error) {
     if (isDuplicateKeyError(error)) {
       res.status(409).json({ error: "Email or username is already in use." });
@@ -289,6 +296,8 @@ router.post("/google", googleLimiter, async (req, res) => {
 
       if (user) {
         user.googleId = payload.sub;
+        // Google only hands us verified emails, so this account's address is now proven.
+        user.emailVerified = true;
         await user.save();
       } else {
         const displayName = normalizeText(payload.name ?? email.split("@")[0]).slice(0, 60) || "Toones user";
@@ -297,7 +306,8 @@ router.post("/google", googleLimiter, async (req, res) => {
           email,
           username: await generateUsername(email),
           displayName,
-          googleId: payload.sub
+          googleId: payload.sub,
+          emailVerified: true
         });
       }
     }
