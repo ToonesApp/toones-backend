@@ -18,11 +18,12 @@ Four people commit to the same backend. Without automated tests, one person's ch
 | Map pin coordinate limits | Full API requests against a real database (Phase 2) |
 | Clip length, category, and audio upload types | |
 | Profile bio rules | |
+| Deleting a drop and deleting an account | |
 
 ## How We Test
 
 - **Unit tests:** each test checks one rule of our code in isolation, in milliseconds.
-- **Route tests:** sign-up and login tests start the real `/auth` routes on a temporary local port and send real HTTP requests, with the user database mocked.
+- **Route tests:** sign-up, login, and delete tests start the real routes on a temporary local port and send real HTTP requests, with the database and file storage mocked.
 - **Tool:** [Vitest](https://vitest.dev). It runs our TypeScript directly and has mocking built in.
 - **No real services:** tests never connect to MongoDB, Google, or Render, and never read `.env`. The login secret is replaced with a fake test value, and database rules are checked without a database connection.
 - **Automatic on every pull request:** GitHub Actions ([`tests.yml`](../.github/workflows/tests.yml)) runs:
@@ -31,7 +32,7 @@ Four people commit to the same backend. Without automated tests, one person's ch
 
 ## Test Cases
 
-IDs: **AUTH** = login and sign-up, **RATE** = rate limits, **VAL** = request format, **GEO** = map pins, **UPL** = audio uploads, **BIO** = profile bio.
+IDs: **AUTH** = login and sign-up, **RATE** = rate limits, **VAL** = request format, **GEO** = map pins, **UPL** = audio uploads, **BIO** = profile bio, **DEL** = deleting a drop, **ACC** = deleting an account.
 
 | ID | What it checks | Expected result | Status |
 |---|---|---|---|
@@ -61,15 +62,27 @@ IDs: **AUTH** = login and sign-up, **RATE** = rate limits, **VAL** = request for
 | BIO-02 | Empty bio | Allowed, so a user can clear it | Pass |
 | BIO-03 | Bio exactly at the length limit; one character over | Limit accepted, one over rejected | Pass |
 | BIO-04 | Bio that is not text | Rejected | Pass |
+| DEL-01 | Owner deletes their drop | 200; the drop, its listens, its audio, and its photos are all deleted | Pass |
+| DEL-02 | Owner deletes their drop | The 40 drop XP is taken back, never going below 0 | Pass |
+| DEL-03 | Someone deletes another user's drop | Blocked with 403, nothing deleted | Pass |
+| DEL-04 | Delete a drop that doesn't exist, or with an invalid id | 404, nothing deleted | Pass |
+| DEL-05 | Delete a drop with no login token | Blocked with 401, nothing deleted | Pass |
+| ACC-01 | Delete account with the correct password | 200; the user, their drops, their listens, and their friend links are all deleted | Pass |
+| ACC-02 | Delete account | The user record is deleted last, so a failure part-way can be retried | Pass |
+| ACC-03 | Delete account with a wrong password | Blocked with 403, nothing deleted | Pass |
+| ACC-04 | Delete a password account without sending the password | Rejected with 400, nothing deleted | Pass |
+| ACC-05 | Delete a Google-only account (no password) | Allowed with just the login token | Pass |
+| ACC-06 | Delete account with no login token | Blocked with 401, nothing deleted | Pass |
 
 ## Results
 
-- **26 of 26 passing** locally (Nov 2, 2026). CI runs them on every pull request.
+- **37 of 37 passing** locally (Nov 2, 2026). CI runs them on every pull request.
 - **Oct 27 demo:** [PR #7](https://github.com/ToonesApp/toones-backend/pull/7) showed "1 check passed" before merge. [CI test log](https://github.com/ToonesApp/toones-backend/actions/runs/40350296263): open the `tests` job, then "Unit tests", to see each test by ID.
 - **Proof the tests catch bugs:**
   - Changing the clip limit from 60 s to 61 s made UPL-01 fail.
   - Loosening the password minimum from 8 to 7 made AUTH-06 fail.
   - Run against the code before issue #11, AUTH-11 to AUTH-14 failed. AUTH-14 hung until it timed out, which confirmed the login bug was real.
+  - Removing the owner check made DEL-03 fail, skipping the password check made ACC-03 fail, and deleting the user record first made ACC-02 fail.
 
 ## Run It Yourself
 
