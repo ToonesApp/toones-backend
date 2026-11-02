@@ -21,3 +21,9 @@ export const loginLimiter = limiter(15 * MINUTE, 10, "Too many login attempts. T
 export const registerLimiter = limiter(60 * MINUTE, 5, "Too many sign-ups from this network. Try again in an hour.");
 
 export const googleLimiter = limiter(15 * MINUTE, 20, "Too many Google sign-in attempts. Try again in 15 minutes.");
+
+/** Counts every request: each one can trigger an email. Per-account throttling happens in the route too. */
+export const forgotPasswordLimiter = limiter(60 * MINUTE, 5, "Too many reset requests. Try again in an hour.");
+
+/** Guessing a reset token is infeasible, but cap attempts anyway. */
+export const resetPasswordLimiter = limiter(15 * MINUTE, 10, "Too many attempts. Try again in 15 minutes.");

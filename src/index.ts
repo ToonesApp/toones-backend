@@ -6,6 +6,7 @@ import { connectMongo } from "./db/connect.js";
 import { jsonBodyErrors } from "./middleware/jsonErrors.js";
 import authRouter from "./routes/auth.js";
 import friendsRouter from "./routes/friends.js";
+import passwordResetRouter from "./routes/passwordReset.js";
 import healthRouter from "./routes/health.js";
 import soundsRouter from "./routes/sounds.js";
 import usersRouter from "./routes/users.js";
@@ -24,6 +25,7 @@ app.use(
 app.use(express.json());
 
 app.use("/auth", authRouter);
+app.use("/auth", passwordResetRouter);
 app.use("/friends", friendsRouter);
 app.use("/health", healthRouter);
 app.use("/sounds", soundsRouter);
