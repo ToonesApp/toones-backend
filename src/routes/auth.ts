@@ -11,7 +11,9 @@ import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
 import { removeSounds } from "../lib/removeSounds.js";
 import { deleteAccountLimiter, googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { EmailVerificationModel } from "../models/EmailVerification.js";
 import { FollowModel } from "../models/Follow.js";
+import { PasswordResetModel } from "../models/PasswordReset.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel } from "../models/Sound.js";
 import { UserModel, type UserDocument } from "../models/User.js";
@@ -445,6 +447,9 @@ router.delete("/me", deleteAccountLimiter, requireAuth, async (req, res) => {
     await removeSounds(sounds);
     await ListenModel.deleteMany({ userId: user._id });
     await FollowModel.deleteMany({ $or: [{ followerId: user._id }, { followingId: user._id }] });
+    // Outstanding reset / verification links die with the account.
+    await PasswordResetModel.deleteMany({ userId: user._id });
+    await EmailVerificationModel.deleteMany({ userId: user._id });
     await UserModel.deleteOne({ _id: user._id });
 
     res.status(200).json({ deleted: true });
