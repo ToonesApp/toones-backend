@@ -28,6 +28,7 @@ export interface Sound {
   /** Up to MAX_PHOTOS_PER_SOUND photos of the place, in upload order. Only the uploader can add them. */
   photos: SoundPhoto[];
   playCount: number;
+  likeCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -141,6 +142,11 @@ const soundSchema = new Schema<Sound>(
       default: []
     },
     playCount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    likeCount: {
       type: Number,
       default: 0,
       min: 0

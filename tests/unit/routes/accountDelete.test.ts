@@ -12,15 +12,17 @@ vi.mock("../../../src/db/connect.js", () => ({ isMongoConnected: () => true }));
 vi.mock("../../../src/models/User.js", () => ({ UserModel: { findById: vi.fn(), deleteOne: vi.fn() } }));
 vi.mock("../../../src/models/Sound.js", async (original) => ({
   ...(await original<object>()),
-  SoundModel: { find: vi.fn() }
+  SoundModel: { find: vi.fn(), updateMany: vi.fn() }
 }));
 vi.mock("../../../src/models/Listen.js", () => ({ ListenModel: { deleteMany: vi.fn() } }));
+vi.mock("../../../src/models/Like.js", () => ({ LikeModel: { find: vi.fn(), deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/Follow.js", () => ({ FollowModel: { deleteMany: vi.fn() } }));
 vi.mock("../../../src/lib/removeSounds.js", () => ({ removeSounds: vi.fn() }));
 
 const { UserModel } = await import("../../../src/models/User.js");
 const { SoundModel } = await import("../../../src/models/Sound.js");
 const { ListenModel } = await import("../../../src/models/Listen.js");
+const { LikeModel } = await import("../../../src/models/Like.js");
 const { FollowModel } = await import("../../../src/models/Follow.js");
 const { removeSounds } = await import("../../../src/lib/removeSounds.js");
 const { default: authRouter } = await import("../../../src/routes/auth.js");
@@ -29,6 +31,8 @@ const users = vi.mocked(UserModel);
 const sounds = vi.mocked(SoundModel);
 const listens = vi.mocked(ListenModel);
 const follows = vi.mocked(FollowModel);
+const likes = vi.mocked(LikeModel);
+const likedSoundIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
 
 const userId = new mongoose.Types.ObjectId();
 const token = jwt.sign({}, "test-secret", { subject: userId.toString() });
@@ -54,6 +58,8 @@ function userWith(hash?: string) {
 function expectNothingDeleted() {
   expect(removeSounds).not.toHaveBeenCalled();
   expect(listens.deleteMany).not.toHaveBeenCalled();
+  expect(likes.deleteMany).not.toHaveBeenCalled();
+  expect(sounds.updateMany).not.toHaveBeenCalled();
   expect(follows.deleteMany).not.toHaveBeenCalled();
   expect(users.deleteOne).not.toHaveBeenCalled();
 }
@@ -74,6 +80,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   userWith(passwordHash);
   sounds.find.mockReturnValue({ lean: () => Promise.resolve(userSounds) } as never);
+  likes.find.mockReturnValue({ lean: () => Promise.resolve(likedSoundIds.map((soundId) => ({ soundId }))) } as never);
 });
 
 describe("DELETE /auth/me", () => {
@@ -93,9 +100,21 @@ describe("DELETE /auth/me", () => {
     await deleteAccount({ password: "correct horse" });
 
     const userDeletedAt = users.deleteOne.mock.invocationCallOrder[0];
-    for (const step of [vi.mocked(removeSounds), listens.deleteMany, follows.deleteMany]) {
+    for (const step of [vi.mocked(removeSounds), listens.deleteMany, likes.deleteMany, follows.deleteMany]) {
       expect(step.mock.invocationCallOrder[0]).toBeLessThan(userDeletedAt);
     }
+  });
+
+  it("[ACC-07] should take the user's like off every drop they liked, then delete their likes", async () => {
+    await deleteAccount({ password: "correct horse" });
+
+    expect(likes.find).toHaveBeenCalledWith({ userId }, "soundId");
+    expect(sounds.updateMany).toHaveBeenCalledWith(
+      { _id: { $in: likedSoundIds }, likeCount: { $gt: 0 } },
+      { $inc: { likeCount: -1 } }
+    );
+    expect(likes.deleteMany).toHaveBeenCalledWith({ userId });
+    expect(sounds.updateMany.mock.invocationCallOrder[0]).toBeLessThan(likes.deleteMany.mock.invocationCallOrder[0]);
   });
 
   it("[ACC-03] should refuse with 403 and delete nothing when the password is wrong", async () => {

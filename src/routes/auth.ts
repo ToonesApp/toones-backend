@@ -12,6 +12,7 @@ import { removeSounds } from "../lib/removeSounds.js";
 import { deleteAccountLimiter, googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { FollowModel } from "../models/Follow.js";
+import { LikeModel } from "../models/Like.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel } from "../models/Sound.js";
 import { UserModel, type UserDocument } from "../models/User.js";
@@ -409,8 +410,8 @@ router.put("/me/look", requireAuth, async (req, res) => {
 });
 
 /**
- * Permanently deletes the signed-in user with their drops (and those drops' files and listens),
- * their listens on other drops, and their friend links. Password accounts must confirm with
+ * Permanently deletes the signed-in user with their drops (and those drops' files, listens and likes),
+ * their listens and likes on other drops, and their friend links. Password accounts must confirm with
  * their current password; Google-only accounts have none, so the session is enough.
  * Listeners keep the XP they earned from the deleted drops.
  */
@@ -444,6 +445,18 @@ router.delete("/me", deleteAccountLimiter, requireAuth, async (req, res) => {
     const sounds = await SoundModel.find({ userId: user._id }, "audioFileId photos").lean();
     await removeSounds(sounds);
     await ListenModel.deleteMany({ userId: user._id });
+
+    // A user likes each sound at most once, so every sound they liked loses exactly one like.
+    const liked = await LikeModel.find({ userId: user._id }, "soundId").lean();
+
+    if (liked.length > 0) {
+      await SoundModel.updateMany(
+        { _id: { $in: liked.map((like) => like.soundId) }, likeCount: { $gt: 0 } },
+        { $inc: { likeCount: -1 } }
+      );
+    }
+
+    await LikeModel.deleteMany({ userId: user._id });
     await FollowModel.deleteMany({ $or: [{ followerId: user._id }, { followingId: user._id }] });
     await UserModel.deleteOne({ _id: user._id });
 
