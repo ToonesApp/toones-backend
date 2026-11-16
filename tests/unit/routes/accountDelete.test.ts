@@ -17,6 +17,8 @@ vi.mock("../../../src/models/Sound.js", async (original) => ({
 vi.mock("../../../src/models/Listen.js", () => ({ ListenModel: { deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/Like.js", () => ({ LikeModel: { find: vi.fn(), deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/Follow.js", () => ({ FollowModel: { deleteMany: vi.fn() } }));
+vi.mock("../../../src/models/PasswordReset.js", () => ({ PasswordResetModel: { deleteMany: vi.fn() } }));
+vi.mock("../../../src/models/EmailVerification.js", () => ({ EmailVerificationModel: { deleteMany: vi.fn() } }));
 vi.mock("../../../src/lib/removeSounds.js", () => ({ removeSounds: vi.fn() }));
 
 const { UserModel } = await import("../../../src/models/User.js");
@@ -24,6 +26,8 @@ const { SoundModel } = await import("../../../src/models/Sound.js");
 const { ListenModel } = await import("../../../src/models/Listen.js");
 const { LikeModel } = await import("../../../src/models/Like.js");
 const { FollowModel } = await import("../../../src/models/Follow.js");
+const { PasswordResetModel } = await import("../../../src/models/PasswordReset.js");
+const { EmailVerificationModel } = await import("../../../src/models/EmailVerification.js");
 const { removeSounds } = await import("../../../src/lib/removeSounds.js");
 const { default: authRouter } = await import("../../../src/routes/auth.js");
 
@@ -94,6 +98,13 @@ describe("DELETE /auth/me", () => {
     expect(listens.deleteMany).toHaveBeenCalledWith({ userId });
     expect(follows.deleteMany).toHaveBeenCalledWith({ $or: [{ followerId: userId }, { followingId: userId }] });
     expect(users.deleteOne).toHaveBeenCalledWith({ _id: userId });
+  });
+
+  it("should also void outstanding password reset and email verification links", async () => {
+    await deleteAccount({ password: "correct horse" });
+
+    expect(PasswordResetModel.deleteMany).toHaveBeenCalledWith({ userId });
+    expect(EmailVerificationModel.deleteMany).toHaveBeenCalledWith({ userId });
   });
 
   it("[ACC-02] should delete the user record last so a failure part-way never leaves orphaned drops", async () => {
