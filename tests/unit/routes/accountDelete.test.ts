@@ -12,8 +12,9 @@ vi.mock("../../../src/db/connect.js", () => ({ isMongoConnected: () => true }));
 vi.mock("../../../src/models/User.js", () => ({ UserModel: { findById: vi.fn(), deleteOne: vi.fn() } }));
 vi.mock("../../../src/models/Sound.js", async (original) => ({
   ...(await original<object>()),
-  SoundModel: { find: vi.fn(), updateMany: vi.fn() }
+  SoundModel: { find: vi.fn(), updateMany: vi.fn(), bulkWrite: vi.fn() }
 }));
+vi.mock("../../../src/models/Comment.js", () => ({ CommentModel: { aggregate: vi.fn(), deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/Listen.js", () => ({ ListenModel: { deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/Like.js", () => ({ LikeModel: { find: vi.fn(), deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/Follow.js", () => ({ FollowModel: { deleteMany: vi.fn() } }));
@@ -26,6 +27,7 @@ const { SoundModel } = await import("../../../src/models/Sound.js");
 const { ListenModel } = await import("../../../src/models/Listen.js");
 const { LikeModel } = await import("../../../src/models/Like.js");
 const { FollowModel } = await import("../../../src/models/Follow.js");
+const { CommentModel } = await import("../../../src/models/Comment.js");
 const { PasswordResetModel } = await import("../../../src/models/PasswordReset.js");
 const { EmailVerificationModel } = await import("../../../src/models/EmailVerification.js");
 const { removeSounds } = await import("../../../src/lib/removeSounds.js");
@@ -85,6 +87,7 @@ beforeEach(() => {
   userWith(passwordHash);
   sounds.find.mockReturnValue({ lean: () => Promise.resolve(userSounds) } as never);
   likes.find.mockReturnValue({ lean: () => Promise.resolve(likedSoundIds.map((soundId) => ({ soundId }))) } as never);
+  vi.mocked(CommentModel.aggregate).mockResolvedValue([] as never);
 });
 
 describe("DELETE /auth/me", () => {
@@ -126,6 +129,25 @@ describe("DELETE /auth/me", () => {
     );
     expect(likes.deleteMany).toHaveBeenCalledWith({ userId });
     expect(sounds.updateMany.mock.invocationCallOrder[0]).toBeLessThan(likes.deleteMany.mock.invocationCallOrder[0]);
+  });
+
+  it("should take the user's comments off other drops' counts, then delete their comments", async () => {
+    const [a, b] = likedSoundIds;
+    vi.mocked(CommentModel.aggregate).mockResolvedValue([{ _id: a, n: 3 }, { _id: b, n: 1 }] as never);
+
+    await deleteAccount({ password: "correct horse" });
+
+    const ops = sounds.bulkWrite.mock.calls[0][0] as unknown as { updateOne: { filter: { _id: unknown } } }[];
+    expect(ops.map((op) => op.updateOne.filter._id)).toEqual([a, b]);
+    expect(CommentModel.deleteMany).toHaveBeenCalledWith({ userId });
+    expect(sounds.bulkWrite.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(CommentModel.deleteMany).mock.invocationCallOrder[0]);
+  });
+
+  it("should skip the count update when the user never commented", async () => {
+    await deleteAccount({ password: "correct horse" });
+
+    expect(sounds.bulkWrite).not.toHaveBeenCalled();
+    expect(CommentModel.deleteMany).toHaveBeenCalledWith({ userId });
   });
 
   it("[ACC-03] should refuse with 403 and delete nothing when the password is wrong", async () => {

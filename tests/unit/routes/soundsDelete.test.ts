@@ -14,6 +14,7 @@ vi.mock("../../../src/models/Sound.js", async (original) => ({
 }));
 vi.mock("../../../src/models/Listen.js", () => ({ ListenModel: { deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/Like.js", () => ({ LikeModel: { deleteMany: vi.fn() } }));
+vi.mock("../../../src/models/Comment.js", () => ({ CommentModel: { deleteMany: vi.fn() } }));
 vi.mock("../../../src/models/User.js", () => ({ UserModel: { findByIdAndUpdate: vi.fn() } }));
 vi.mock("../../../src/lib/audio.js", async (original) => ({ ...(await original<object>()), deleteAudio: vi.fn() }));
 vi.mock("../../../src/lib/photo.js", async (original) => ({ ...(await original<object>()), deletePhoto: vi.fn() }));
@@ -21,6 +22,7 @@ vi.mock("../../../src/lib/photo.js", async (original) => ({ ...(await original<o
 const { SoundModel } = await import("../../../src/models/Sound.js");
 const { ListenModel } = await import("../../../src/models/Listen.js");
 const { LikeModel } = await import("../../../src/models/Like.js");
+const { CommentModel } = await import("../../../src/models/Comment.js");
 const { UserModel } = await import("../../../src/models/User.js");
 const { deleteAudio } = await import("../../../src/lib/audio.js");
 const { deletePhoto } = await import("../../../src/lib/photo.js");
@@ -54,6 +56,7 @@ function expectNothingDeleted() {
   expect(sounds.deleteMany).not.toHaveBeenCalled();
   expect(listens.deleteMany).not.toHaveBeenCalled();
   expect(LikeModel.deleteMany).not.toHaveBeenCalled();
+  expect(CommentModel.deleteMany).not.toHaveBeenCalled();
   expect(deleteAudio).not.toHaveBeenCalled();
   expect(deletePhoto).not.toHaveBeenCalled();
   expect(users.findByIdAndUpdate).not.toHaveBeenCalled();
@@ -85,6 +88,7 @@ describe("DELETE /sounds/:id", () => {
     expect(body).toEqual({ deleted: true, xp: 60, level: 1 });
     expect(listens.deleteMany).toHaveBeenCalledWith({ soundId: { $in: [soundId] } });
     expect(LikeModel.deleteMany).toHaveBeenCalledWith({ soundId: { $in: [soundId] } });
+    expect(CommentModel.deleteMany).toHaveBeenCalledWith({ soundId: { $in: [soundId] } });
     expect(sounds.deleteMany).toHaveBeenCalledWith({ _id: { $in: [soundId] } });
     expect(deleteAudio).toHaveBeenCalledWith(audioFileId);
     expect(deletePhoto).toHaveBeenCalledTimes(2);

@@ -6,6 +6,7 @@ import { connectMongo } from "./db/connect.js";
 import { jsonBodyErrors } from "./middleware/jsonErrors.js";
 import { sessionRevocation } from "./middleware/sessionRevocation.js";
 import authRouter from "./routes/auth.js";
+import commentsRouter from "./routes/comments.js";
 import emailVerificationRouter from "./routes/emailVerification.js";
 import friendsRouter from "./routes/friends.js";
 import passwordResetRouter from "./routes/passwordReset.js";
@@ -34,6 +35,7 @@ app.use("/auth", emailVerificationRouter);
 app.use("/friends", friendsRouter);
 app.use("/health", healthRouter);
 app.use("/sounds", soundsRouter);
+app.use("/sounds", commentsRouter);
 app.use("/users", usersRouter);
 
 app.use(jsonBodyErrors);
