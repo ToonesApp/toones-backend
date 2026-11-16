@@ -30,6 +30,7 @@ type SoundRow = {
   durationSec: number;
   placeName?: string;
   playCount: number;
+  likeCount?: number;
   createdAt: Date;
 };
 
@@ -66,7 +67,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
       SoundModel.countDocuments({ userId: user._id }),
       FollowModel.countDocuments({ followerId: user._id }),
       FollowModel.countDocuments({ followingId: user._id }),
-      SoundModel.find({ userId: user._id }, "title category durationSec placeName playCount createdAt")
+      SoundModel.find({ userId: user._id }, "title category durationSec placeName playCount likeCount createdAt")
         .sort({ createdAt: -1 })
         .limit(recentSoundLimit)
         .lean() as unknown as Promise<SoundRow[]>,
@@ -96,6 +97,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
           durationSec: sound.durationSec,
           placeName: sound.placeName ?? "",
           playCount: sound.playCount,
+          likeCount: sound.likeCount ?? 0,
           createdAt: sound.createdAt.toISOString()
         }))
       }
