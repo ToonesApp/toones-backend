@@ -29,6 +29,7 @@ export interface Sound {
   photos: SoundPhoto[];
   playCount: number;
   likeCount: number;
+  commentCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -147,6 +148,11 @@ const soundSchema = new Schema<Sound>(
       min: 0
     },
     likeCount: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    commentCount: {
       type: Number,
       default: 0,
       min: 0

@@ -2,6 +2,7 @@ import bcrypt from "bcrypt";
 import { Router, type Response } from "express";
 import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
+import type { Types } from "mongoose";
 
 import { env } from "../config/env.js";
 import { isMongoConnected } from "../db/connect.js";
@@ -11,6 +12,7 @@ import { firstLockedPart, parseLook, plainLook } from "../lib/look.js";
 import { removeSounds } from "../lib/removeSounds.js";
 import { deleteAccountLimiter, googleLimiter, loginLimiter, registerLimiter } from "../middleware/rateLimit.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { CommentModel } from "../models/Comment.js";
 import { EmailVerificationModel } from "../models/EmailVerification.js";
 import { FollowModel } from "../models/Follow.js";
 import { PasswordResetModel } from "../models/PasswordReset.js";
@@ -459,6 +461,25 @@ router.delete("/me", deleteAccountLimiter, requireAuth, async (req, res) => {
     }
 
     await LikeModel.deleteMany({ userId: user._id });
+
+    // Their comments on other people's sounds go too; each of those sounds loses as many as the user wrote there.
+    const commented = await CommentModel.aggregate<{ _id: Types.ObjectId; n: number }>([
+      { $match: { userId: user._id } },
+      { $group: { _id: "$soundId", n: { $sum: 1 } } }
+    ]);
+
+    if (commented.length > 0) {
+      await SoundModel.bulkWrite(
+        commented.map(({ _id, n }) => ({
+          updateOne: {
+            filter: { _id },
+            update: [{ $set: { commentCount: { $max: [0, { $subtract: [{ $ifNull: ["$commentCount", 0] }, n] }] } } }]
+          }
+        }))
+      );
+    }
+
+    await CommentModel.deleteMany({ userId: user._id });
     await FollowModel.deleteMany({ $or: [{ followerId: user._id }, { followingId: user._id }] });
     // Outstanding reset / verification links die with the account.
     await PasswordResetModel.deleteMany({ userId: user._id });

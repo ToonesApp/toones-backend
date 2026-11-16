@@ -64,6 +64,11 @@ Audio files are stored in MongoDB GridFS (bucket `audio`), so there is no separa
 - `POST /sounds/:id/listen` (bearer token): the first listen per user earns XP; replays only bump `playCount`. Returns `{ firstListen, playCount, xp, level }`.
 - `POST /sounds/:id/photos` (bearer token, uploader only): multipart form with one `photo` file (JPEG, PNG or WebP, detected from the file's bytes; max 4 MB). Up to 3 photos per sound. Returns `{ photos }`, the sound's photo URLs.
 - `GET /sounds/:id/photos/:photoId`: streams a photo. Public, so a plain `<img>` works. Sound objects in the feed include a `photos` array of these URLs.
+- `PUT /sounds/:id/like` / `DELETE /sounds/:id/like` (bearer token): like or unlike; safe to repeat. Returns `{ liked, likeCount }`. `GET /sounds/:id/likes` (bearer token) lists who liked it, newest first.
+- `GET /sounds/:id/comments`: comments, newest first (`limit` max 100, `before` cursor from `nextBefore`). Public; with a bearer token each comment has `mine` and `canDelete`. Returns `{ comments, commentCount, nextBefore }`.
+- `POST /sounds/:id/comments` (bearer token): `{ text }`, 1-280 characters after trimming. Returns `{ comment, commentCount }`.
+- `DELETE /sounds/:id/comments/:commentId` (bearer token): allowed for the comment's author and the sound's owner. Returns `{ deleted, commentCount }`.
+- Feed and profile sounds include `likeCount`, `commentCount` and (feed, signed in) `liked`. Deleting a drop removes its comments; deleting an account removes the user's comments and lowers those drops' counts.
 
 Photos are stored in GridFS too (bucket `photos`).
 

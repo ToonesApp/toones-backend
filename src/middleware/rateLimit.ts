@@ -46,3 +46,8 @@ export const deleteSoundLimiter = limiter(15 * MINUTE, 60, "Too many deletes. Tr
 export const likeLimiter = limiter(15 * MINUTE, 300, "Too many likes. Try again in a few minutes.");
 
 export const likersLimiter = limiter(15 * MINUTE, 300, "Too many requests. Try again in a few minutes.");
+
+/** Posting and deleting comments. */
+export const commentLimiter = limiter(15 * MINUTE, 60, "Too many comments. Try again in a few minutes.");
+
+export const commentsReadLimiter = limiter(15 * MINUTE, 600, "Too many requests. Try again in a few minutes.");
