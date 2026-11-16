@@ -9,7 +9,8 @@ import { MAX_PHOTOS_PER_SOUND, MAX_PHOTO_BYTES, deletePhoto, openPhoto, photoLen
 import { removeSounds } from "../lib/removeSounds.js";
 import { XP_PER_DROP, XP_PER_LISTEN, levelFromXp } from "../lib/xp.js";
 import { deleteSoundLimiter, likeLimiter, likersLimiter } from "../middleware/rateLimit.js";
-import { optionalAuth, requireAuth } from "../middleware/requireAuth.js";
+import { signMediaPath, requireSignedMedia } from "../middleware/mediaUrl.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 import { FollowModel } from "../models/Follow.js";
 import { LikeModel } from "../models/Like.js";
 import { ListenModel } from "../models/Listen.js";
@@ -86,7 +87,9 @@ function origin(req: Request): string {
 }
 
 function photoUrls(req: Request, sound: Pick<SoundLean, "_id" | "photos">): string[] {
-  return (sound.photos ?? []).map((photo) => `${origin(req)}/sounds/${sound._id.toString()}/photos/${photo.fileId.toString()}`);
+  return (sound.photos ?? []).map(
+    (photo) => `${origin(req)}${signMediaPath(`/sounds/${sound._id.toString()}/photos/${photo.fileId.toString()}`)}`
+  );
 }
 
 function publicSound(
@@ -110,8 +113,8 @@ function publicSound(
     placeName: sound.placeName ?? "",
     playCount: sound.playCount,
     likeCount: sound.likeCount ?? 0,
-    // Audio stored by this API is saved as a relative path; make it absolute for the client.
-    audioUrl: sound.audioUrl.startsWith("/") ? `${origin(req)}${sound.audioUrl}` : sound.audioUrl,
+    // Audio stored by this API is saved as a relative path; make it absolute and sign it for the client.
+    audioUrl: sound.audioUrl.startsWith("/") ? `${origin(req)}${signMediaPath(sound.audioUrl)}` : sound.audioUrl,
     photos: photoUrls(req, sound),
     createdAt: sound.createdAt.toISOString(),
     author: author ?? null,
@@ -267,7 +270,7 @@ router.post("/", requireAuth, async (req, res) => {
  * The feed, newest first. Optional query: `category` (comma list), `limit`, `before` (ISO date cursor),
  * and `near=lon,lat` with `radiusKm` to restrict to a circle.
  */
-router.get("/", optionalAuth, async (req, res) => {
+router.get("/", requireAuth, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }
@@ -343,8 +346,8 @@ router.get("/", optionalAuth, async (req, res) => {
   }
 });
 
-/** Stream a sound's audio. Public: playback uses a plain <audio>/fetch without credentials. */
-router.get("/:id/audio", async (req, res) => {
+/** Stream a sound's audio. Gated by a short-lived signed URL so a plain <audio> can load it. */
+router.get("/:id/audio", requireSignedMedia, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }
@@ -514,8 +517,8 @@ router.delete("/:id", deleteSoundLimiter, requireAuth, async (req, res) => {
   }
 });
 
-/** Stream one photo. Public, so a plain <img> works. */
-router.get("/:id/photos/:photoId", async (req, res) => {
+/** Stream one photo. Gated by a short-lived signed URL so a plain <img> can load it. */
+router.get("/:id/photos/:photoId", requireSignedMedia, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }

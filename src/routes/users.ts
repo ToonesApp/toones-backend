@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 import { isMongoConnected } from "../db/connect.js";
 import { plainLook, type Look } from "../lib/look.js";
 import { levelFromXp } from "../lib/xp.js";
-import { optionalAuth } from "../middleware/requireAuth.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 import { FollowModel } from "../models/Follow.js";
 import { SoundModel } from "../models/Sound.js";
 import { UserModel } from "../models/User.js";
@@ -44,10 +44,10 @@ function ensureMongo(res: Response): boolean {
 }
 
 /**
- * Anyone's public profile by username. Only safe fields are returned: no email and no raw xp.
- * When the caller is signed in it also says how the two of you are connected.
+ * A member's profile by username, for signed-in callers only. Only safe fields are returned:
+ * no email and no raw xp. It also says how the two of you are connected.
  */
-router.get("/:username", optionalAuth, async (req, res) => {
+router.get("/:username", requireAuth, async (req, res) => {
   if (!ensureMongo(res)) {
     return;
   }

@@ -165,13 +165,10 @@ describe("GET /sounds like fields", () => {
     ]);
   });
 
-  it("[LIKE-08] should show counts but liked=false for everyone when signed out", async () => {
-    const { body } = await call("GET", "/", false);
+  it("[LIKE-08] should reject the feed when signed out", async () => {
+    const { status } = await call("GET", "/", false);
 
-    expect(body.sounds.map((s: any) => [s.likeCount, s.liked])).toEqual([
-      [5, false],
-      [0, false]
-    ]);
+    expect(status).toBe(401);
     expect(likes.find).not.toHaveBeenCalled();
   });
 });
