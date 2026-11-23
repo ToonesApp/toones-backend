@@ -1,5 +1,6 @@
 import type mongoose from "mongoose";
 
+import { CommentModel } from "../models/Comment.js";
 import { LikeModel } from "../models/Like.js";
 import { ListenModel } from "../models/Listen.js";
 import { SoundModel } from "../models/Sound.js";
@@ -13,7 +14,7 @@ export type RemovableSound = {
 };
 
 /**
- * Deletes sounds together with everything attached to them: their listens and likes, and their audio and photo files in GridFS.
+ * Deletes sounds together with everything attached to them: their listens, likes and comments, and their audio and photo files in GridFS.
  * The documents go first so a sound never points at a missing file; file deletes are best-effort.
  */
 export async function removeSounds(sounds: RemovableSound[]): Promise<void> {
@@ -25,6 +26,7 @@ export async function removeSounds(sounds: RemovableSound[]): Promise<void> {
 
   await ListenModel.deleteMany({ soundId: { $in: ids } });
   await LikeModel.deleteMany({ soundId: { $in: ids } });
+  await CommentModel.deleteMany({ soundId: { $in: ids } });
   await SoundModel.deleteMany({ _id: { $in: ids } });
 
   await Promise.all(
