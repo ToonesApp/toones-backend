@@ -30,7 +30,7 @@ Expected response:
 
 ## Backend Environment
 
-Create a local `.env` file when running the API.
+Create a local `.env` file when running the API. Production on Render is driven by `render.yaml` plus dashboard secrets.
 
 - `PORT`: local API port
 - `MONGODB_URI`: MongoDB connection string
@@ -39,6 +39,15 @@ Create a local `.env` file when running the API.
 - `APP_URL`: public URL of the web app; reset emails link to `<APP_URL>/reset-password` (defaults to the first `CORS_ORIGIN`)
 - `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM`: outgoing email. With no `SMTP_HOST` the email is printed to the console in development; in production it is required.
 - `CORS_ORIGIN`: allowed React origin, usually `http://localhost:5173`. Accepts a comma-separated list to allow the deployed client alongside local dev.
+
+`GET /health` reports `{ auth: { google, smtp, appUrl } }` (booleans / public URL only) so you can confirm the live API picked up Google and SMTP after a deploy.
+
+### Production checklist (Render + Vercel)
+
+1. **Render** (`toones-api`): set dashboard secrets `MONGODB_URI`, `JWT_SECRET`, and the SMTP quartet (`SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` / `MAIL_FROM`). `GOOGLE_CLIENT_ID`, `APP_URL`, and `CORS_ORIGIN` are listed in `render.yaml`.
+2. **Vercel** (frontend): production builds read `toones-app/.env.production` (`VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`). Override in the Vercel project env if needed.
+3. **Google Cloud** OAuth client: add `https://toones.vercel.app` under Authorized JavaScript origins (and `http://localhost:5173` for local).
+4. After deploy, check `https://toones-api.onrender.com/health` — `auth.google` and `auth.smtp` should both be `true` before reset/verify mail will arrive.
 
 ## Auth API
 
