@@ -9,12 +9,26 @@ services:
     healthCheckPath: /health
     envVars:
       # Render injects PORT itself; src/config/env.ts already reads it.
-      # Secrets are set in the dashboard, never committed here.
+      # Secrets stay in the dashboard (sync: false). Public client config can live here.
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: CORS_ORIGIN
-        sync: false
       - key: GOOGLE_CLIENT_ID
+        value: 482408324294-34q79716rdblufidft1mou4nuam8vtje.apps.googleusercontent.com
+      - key: APP_URL
+        value: https://toones.vercel.app
+      - key: CORS_ORIGIN
+        value: https://toones.vercel.app,http://localhost:5173
+      # Required for password-reset and verify-email mail. Set these in the Render dashboard
+      # (e.g. Resend: SMTP_HOST=smtp.resend.com, SMTP_USER=resend, SMTP_PASS=<api key>).
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: MAIL_FROM
         sync: false
