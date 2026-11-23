@@ -50,6 +50,8 @@ type SoundLean = {
   playCount: number;
   /** Missing on sounds saved before likes existed. */
   likeCount?: number;
+  /** Missing on sounds saved before comments existed. */
+  commentCount?: number;
   createdAt: Date;
 };
 
@@ -113,8 +115,9 @@ function publicSound(
     placeName: sound.placeName ?? "",
     playCount: sound.playCount,
     likeCount: sound.likeCount ?? 0,
-    // Audio stored by this API is saved as a relative path; make it absolute and sign it for the client.
-    audioUrl: sound.audioUrl.startsWith("/") ? `${origin(req)}${signMediaPath(sound.audioUrl)}` : sound.audioUrl,
+    commentCount: sound.commentCount ?? 0,
+    // Audio stored by this API is saved as a relative path; make it absolute for the client.
+    audioUrl: sound.audioUrl.startsWith("/") ? `${origin(req)}${sound.audioUrl}` : sound.audioUrl,
     photos: photoUrls(req, sound),
     createdAt: sound.createdAt.toISOString(),
     author: author ?? null,
